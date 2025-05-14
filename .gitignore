@@ -11,8 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-.json
-
+firebase-adminsdk.json
 # IntelliJ related
 *.iml
 *.ipr
