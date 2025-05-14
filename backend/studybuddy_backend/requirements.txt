@@ -1,0 +1,9 @@
+Django
+djangorestframework
+django-cors-headers
+django-filter
+firebase-admin
+mysqlclient
+Pillow
+drf-yasg
+coreapi
