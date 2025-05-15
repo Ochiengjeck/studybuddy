@@ -11,7 +11,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # API routes
-    # path('api/users/', include('users.urls')),
+    path('api/users/', include('users.urls')),
     # path('api/tutoring/', include('tutoring.urls')),
     # path('api/gamification/', include('gamification.urls')),
     # path('api/analytics/', include('analytics.urls')),
