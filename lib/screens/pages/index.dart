@@ -80,79 +80,81 @@ class _IndexState extends State<Index> with TickerProviderStateMixin {
       context: context,
       backgroundColor: Colors.transparent,
       builder:
-          (context) => Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
+          (context) => SingleChildScrollView(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
                 ),
-              ],
-            ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
                   ),
-                ),
-                const SizedBox(height: 20),
-                _buildUserInfo(),
-                const SizedBox(height: 20),
-                _buildMenuTile(
-                  icon: Icons.person_outline_rounded,
-                  title: 'Account Settings',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Navigate to account settings
-                  },
-                ),
-                _buildMenuTile(
-                  icon: Icons.apps_rounded,
-                  title: 'Applications',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Navigate to applications
-                  },
-                ),
-                _buildMenuTile(
-                  icon: Icons.help_outline_rounded,
-                  title: 'Help & Support',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Navigate to help
-                  },
-                ),
-                _buildMenuTile(
-                  icon: Icons.privacy_tip_outlined,
-                  title: 'Privacy Policy',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Navigate to privacy policy
-                  },
-                ),
-                const Divider(height: 30),
-                _buildMenuTile(
-                  icon: Icons.logout_rounded,
-                  title: 'Logout',
-                  isDestructive: true,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showLogoutDialog(context);
-                  },
-                ),
-                const SizedBox(height: 10),
-              ],
+                ],
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildUserInfo(),
+                  const SizedBox(height: 20),
+                  _buildMenuTile(
+                    icon: Icons.person_outline_rounded,
+                    title: 'Account Settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigate to account settings
+                    },
+                  ),
+                  _buildMenuTile(
+                    icon: Icons.apps_rounded,
+                    title: 'Applications',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigate to applications
+                    },
+                  ),
+                  _buildMenuTile(
+                    icon: Icons.help_outline_rounded,
+                    title: 'Help & Support',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigate to help
+                    },
+                  ),
+                  _buildMenuTile(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacy Policy',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigate to privacy policy
+                    },
+                  ),
+                  const Divider(height: 30),
+                  _buildMenuTile(
+                    icon: Icons.logout_rounded,
+                    title: 'Logout',
+                    isDestructive: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showLogoutDialog(context);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
             ),
           ),
     );

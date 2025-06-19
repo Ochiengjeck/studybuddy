@@ -57,7 +57,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.name),
+                SizedBox(width: 120, child: Text(widget.name,maxLines: 1,overflow: TextOverflow.ellipsis,softWrap: true,)),
                 const Text('Online', style: TextStyle(fontSize: 12)),
               ],
             ),

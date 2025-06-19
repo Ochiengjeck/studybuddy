@@ -72,7 +72,7 @@ class _TutorsScreenState extends State<TutorsScreen>
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 768;
-    final crossAxisCount = isTablet ? 4 : 2;
+    final crossAxisCount = isTablet ? 3 : 1;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -332,7 +332,7 @@ class _TutorsScreenState extends State<TutorsScreen>
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
-                  childAspectRatio: .55,
+                  childAspectRatio: isTablet? .55 : .9,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
                 ),

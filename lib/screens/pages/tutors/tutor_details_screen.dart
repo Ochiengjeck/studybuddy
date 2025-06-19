@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../messages/chat_screen.dart';
+import 'tutor_booking_screen.dart';
 
 class TutorDetailsScreen extends StatelessWidget {
   final String name;
@@ -320,7 +321,9 @@ class TutorDetailsScreen extends StatelessWidget {
           const SizedBox(width: 16),
           FloatingActionButton.extended(
             heroTag: 'book_session',
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder:  (context) => TutorBookingScreen(tutorName: name, tutorImage: 'https://i.pinimg.com/736x/03/eb/d6/03ebd625cc0b9d636256ecc44c0ea324.jpg', subjects: subjects,),));
+            },
             backgroundColor: Colors.blue.shade600,
             foregroundColor: Colors.white,
             icon: const Icon(Icons.calendar_today),

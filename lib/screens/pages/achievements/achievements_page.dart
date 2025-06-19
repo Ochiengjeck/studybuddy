@@ -227,7 +227,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                     sliver: SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: _getCrossAxisCount(context),
-                        childAspectRatio: 1.5,
+                        childAspectRatio: 1.1,
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,
                       ),
@@ -311,7 +311,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                     sliver: SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: _getCrossAxisCount(context),
-                        childAspectRatio: 1.2,
+                        childAspectRatio: .9,
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,
                       ),

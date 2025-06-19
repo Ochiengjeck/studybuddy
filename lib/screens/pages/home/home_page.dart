@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:studybuddy/screens/pages/sessions/sessions_screen.dart';
 
 import '../../../widgets/session_card.dart';
 import '../../../widgets/stats_card.dart';
@@ -59,9 +60,18 @@ class HomePage extends StatelessWidget {
               ],
             ),
             SizedBox(height: 20),
-            Text(
-              'Upcoming Sessions',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Upcoming Sessions',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                TextButton(onPressed: (){Navigator.push(context, MaterialPageRoute(builder: (context){
+                  return Scaffold(appBar: AppBar(),body: SessionsScreen(),);
+                },)); }, child: Text("View All.."))
+              ],
             ),
             SizedBox(height: 10),
             SessionCard(

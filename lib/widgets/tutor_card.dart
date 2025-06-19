@@ -60,7 +60,7 @@ class TutorCard extends StatelessWidget {
                             Positioned(
                               top: -50,
                               child: CircleAvatar(
-                                radius: 40,
+                                radius: 30,
                                 backgroundImage: NetworkImage(imageUrl),
                               ),
                             ),
@@ -93,7 +93,7 @@ class TutorCard extends StatelessWidget {
                         runSpacing: 8,
                         children:
                             subjects
-                                .take(3)
+                                .take(2)
                                 .map(
                                   (subject) => Chip(
                                     label: Text(subject),

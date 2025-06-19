@@ -32,10 +32,10 @@ class AppTheme {
       bodySmall: AppStyles.caption,
       labelSmall: AppStyles.overline,
     ),
-    cardTheme: CardTheme(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    ),
+    // cardTheme: CardTheme(
+    //   elevation: 4,
+    //   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    // ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.bgSecondary,
@@ -95,11 +95,11 @@ class AppTheme {
         color: AppColors.textSecondaryDark,
       ),
     ),
-    cardTheme: CardTheme(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: AppColors.bgSecondaryDark,
-    ),
+    // cardTheme: CardTheme(
+    //   elevation: 4,
+    //   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    //   color: AppColors.bgSecondaryDark,
+    // ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.bgSecondaryDark,

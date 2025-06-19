@@ -260,6 +260,7 @@ class SessionDetailsScreen extends StatelessWidget {
                                     const Text('4.9'),
                                     const SizedBox(width: 12),
                                     Container(
+                                      width: 80,
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
                                         vertical: 2,
@@ -270,6 +271,7 @@ class SessionDetailsScreen extends StatelessWidget {
                                       ),
                                       child: const Text(
                                         '127+ sessions',
+                                        softWrap: true,overflow: TextOverflow.ellipsis,maxLines: 1,
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.blue,

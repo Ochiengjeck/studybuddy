@@ -29,22 +29,13 @@ class StatsCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    Text(
-                      title,
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).primaryColor,
+                  ),
                 ),
                 Container(
                   width: 50,
@@ -58,12 +49,29 @@ class StatsCard extends StatelessWidget {
               ],
             ),
             SizedBox(height: 16),
-            LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).primaryColor,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                   Padding(
+                     padding: const EdgeInsets.only(bottom: 10.0),
+                     child: SizedBox(
+                        width: 100,
+                        child: Text(
+                          title,
+                          softWrap: true,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 14, color: Colors.grey,),
+                        ),
+                      ),
+                   ),
+                LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
