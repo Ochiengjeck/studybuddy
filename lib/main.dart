@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:studybuddy/screens/onboarding/role_selection_screen.dart';
+import 'package:studybuddy/screens/onboarding/splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: RoleSelectionScreen(),
+      home: SplashScreen(),
     );
   }
 }

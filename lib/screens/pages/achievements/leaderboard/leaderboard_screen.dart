@@ -1,298 +1,819 @@
 import 'package:flutter/material.dart';
 
-class LeaderboardPage extends StatelessWidget {
+class LeaderboardPage extends StatefulWidget {
   const LeaderboardPage({Key? key}) : super(key: key);
 
   @override
+  State<LeaderboardPage> createState() => _LeaderboardPageState();
+}
+
+class _LeaderboardPageState extends State<LeaderboardPage>
+    with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  String selectedFilter = 'This Month';
+  final List<String> filters = ['Overall', 'This Month', 'By Subject'];
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
+
+    _fadeController.forward();
+    _slideController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Top Tutors This Month',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors:
+                isDark
+                    ? [
+                      const Color(0xFF0F0F23),
+                      const Color(0xFF1A1A2E),
+                      const Color(0xFF16213E),
+                    ]
+                    : [
+                      const Color(0xFFF8FAFF),
+                      const Color(0xFFE8F2FF),
+                      const Color(0xFFF0F8FF),
+                    ],
+          ),
+        ),
+        child: SafeArea(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: CustomScrollView(
+                slivers: [
+                  // Header Section
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 24),
+
+                          // Filter Chips
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children:
+                                  filters
+                                      .map(
+                                        (filter) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
+                                          child: FilterChip(
+                                            label: Text(filter),
+                                            selected: selectedFilter == filter,
+                                            onSelected: (selected) {
+                                              if (selected) {
+                                                setState(() {
+                                                  selectedFilter = filter;
+                                                });
+                                              }
+                                            },
+                                            backgroundColor:
+                                                isDark
+                                                    ? Colors.grey[800]
+                                                    : Colors.grey[100],
+                                            selectedColor: theme.primaryColor
+                                                .withOpacity(0.2),
+                                            checkmarkColor: theme.primaryColor,
+                                            labelStyle: TextStyle(
+                                              color:
+                                                  selectedFilter == filter
+                                                      ? theme.primaryColor
+                                                      : (isDark
+                                                          ? Colors.grey[300]
+                                                          : Colors.grey[700]),
+                                              fontWeight:
+                                                  selectedFilter == filter
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                            ),
+                                            side: BorderSide(
+                                              color:
+                                                  selectedFilter == filter
+                                                      ? theme.primaryColor
+                                                      : Colors.transparent,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      'Ranked by points earned from tutoring sessions',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    TextButton(onPressed: () {}, child: Text('Overall')),
-                    TextButton(
-                      onPressed: () {},
-                      child: Text(
-                        'This Month',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
+                  ),
+
+                  // Top 3 Podium
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        height: 400,
+                        decoration: BoxDecoration(
+                          color:
+                              isDark
+                                  ? Colors.grey[900]?.withOpacity(0.5)
+                                  : Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color:
+                                isDark ? Colors.grey[800]! : Colors.grey[200]!,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            // Background decoration
+                            Positioned(
+                              top: -50,
+                              right: -50,
+                              child: Container(
+                                width: 150,
+                                height: 150,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.amber.withOpacity(0.1),
+                                      Colors.orange.withOpacity(0.05),
+                                    ],
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.emoji_events,
+                                        color: Colors.amber,
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Top Performers',
+                                        style: theme.textTheme.titleLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color:
+                                                  isDark
+                                                      ? Colors.white
+                                                      : const Color(0xFF1A1A2E),
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                  Expanded(
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        _buildPodiumPosition(
+                                          context,
+                                          position: 2,
+                                          name: 'Michael Chen',
+                                          subject: 'Computer Science',
+                                          points: '2,450',
+                                          imageUrl:
+                                              'https://picsum.photos/200/200?random=16',
+                                          height: 140,
+                                        ),
+                                        _buildPodiumPosition(
+                                          context,
+                                          position: 1,
+                                          name: 'Sarah Johnson',
+                                          subject: 'Mathematics',
+                                          points: '3,120',
+                                          imageUrl:
+                                              'https://picsum.photos/200/200?random=10',
+                                          height: 180,
+                                          isFirst: true,
+                                        ),
+                                        _buildPodiumPosition(
+                                          context,
+                                          position: 3,
+                                          name: 'David Lee',
+                                          subject: 'Chemistry',
+                                          points: '2,210',
+                                          imageUrl:
+                                              'https://picsum.photos/200/200?random=13',
+                                          height: 120,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    TextButton(onPressed: () {}, child: Text('By Subject')),
-                  ],
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
-            // Top 3 Leaders
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildTopLeader(
-                  context,
-                  position: 2,
-                  name: 'Michael Chen',
-                  subject: 'Computer Science',
-                  points: '2,450',
-                  imageUrl: 'https://picsum.photos/200/200?random=16',
-                ),
-                _buildTopLeader(
-                  context,
-                  position: 1,
-                  name: 'Sarah Johnson',
-                  subject: 'Mathematics',
-                  points: '3,120',
-                  imageUrl: 'https://picsum.photos/200/200?random=10',
-                  isFirst: true,
-                ),
-                _buildTopLeader(
-                  context,
-                  position: 3,
-                  name: 'David Lee',
-                  subject: 'Chemistry',
-                  points: '2,210',
-                  imageUrl: 'https://picsum.photos/200/200?random=13',
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
-            // Rest of Leaderboard
-            _buildLeaderboardItem(
-              context,
-              position: 4,
-              name: 'Emily Rodriguez',
-              detail: 'Economics | 1,980 pts',
-              points: '1,980',
-              imageUrl: 'https://picsum.photos/200/200?random=17',
-            ),
-            _buildLeaderboardItem(
-              context,
-              position: 5,
-              name: 'Robert Wilson',
-              detail: 'Physics | 1,870 pts',
-              points: '1,870',
-              imageUrl: 'https://picsum.photos/200/200?random=18',
-            ),
-            _buildLeaderboardItem(
-              context,
-              position: 6,
-              name: 'Jennifer Adams',
-              detail: 'English | 1,750 pts',
-              points: '1,750',
-              imageUrl: 'https://picsum.photos/200/200?random=19',
-            ),
-            _buildLeaderboardItem(
-              context,
-              position: 7,
-              name: 'Alex Thompson',
-              detail: 'Statistics | 1,620 pts',
-              points: '1,620',
-              imageUrl: 'https://picsum.photos/200/200?random=20',
-            ),
-            _buildLeaderboardItem(
-              context,
-              position: 8,
-              name: 'John Doe',
-              detail: 'Mathematics | 1,540 pts',
-              points: '1,540',
-              imageUrl: 'https://picsum.photos/200/200?random=2',
-              isCurrentUser: true,
-            ),
-            _buildLeaderboardItem(
-              context,
-              position: 9,
-              name: 'Maria Garcia',
-              detail: 'Literature | 1,480 pts',
-              points: '1,480',
-              imageUrl: 'https://picsum.photos/200/200?random=21',
-            ),
-            _buildLeaderboardItem(
-              context,
-              position: 10,
-              name: 'James Brown',
-              detail: 'Computer Science | 1,420 pts',
-              points: '1,420',
-              imageUrl: 'https://picsum.photos/200/200?random=22',
-            ),
-            SizedBox(height: 20),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {},
-                child: Text('View Full Leaderboard'),
+                  ),
+
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+                  // Leaderboard List
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.blue, Colors.cyan],
+                              ),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Full Rankings',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color:
+                                  isDark
+                                      ? Colors.white
+                                      : const Color(0xFF1A1A2E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                  // Leaderboard Items
+                  SliverList(
+                    delegate: SliverChildListDelegate([
+                      _buildModernLeaderboardItem(
+                        context,
+                        position: 4,
+                        name: 'Emily Rodriguez',
+                        subject: 'Economics',
+                        points: '1,980',
+                        imageUrl: 'https://picsum.photos/200/200?random=17',
+                      ),
+                      _buildModernLeaderboardItem(
+                        context,
+                        position: 5,
+                        name: 'Robert Wilson',
+                        subject: 'Physics',
+                        points: '1,870',
+                        imageUrl: 'https://picsum.photos/200/200?random=18',
+                      ),
+                      _buildModernLeaderboardItem(
+                        context,
+                        position: 6,
+                        name: 'Jennifer Adams',
+                        subject: 'English',
+                        points: '1,750',
+                        imageUrl: 'https://picsum.photos/200/200?random=19',
+                      ),
+                      _buildModernLeaderboardItem(
+                        context,
+                        position: 7,
+                        name: 'Alex Thompson',
+                        subject: 'Statistics',
+                        points: '1,620',
+                        imageUrl: 'https://picsum.photos/200/200?random=20',
+                      ),
+                      _buildModernLeaderboardItem(
+                        context,
+                        position: 8,
+                        name: 'John Doe',
+                        subject: 'Mathematics',
+                        points: '1,540',
+                        imageUrl: 'https://picsum.photos/200/200?random=2',
+                        isCurrentUser: true,
+                      ),
+                      _buildModernLeaderboardItem(
+                        context,
+                        position: 9,
+                        name: 'Maria Garcia',
+                        subject: 'Literature',
+                        points: '1,480',
+                        imageUrl: 'https://picsum.photos/200/200?random=21',
+                      ),
+                      _buildModernLeaderboardItem(
+                        context,
+                        position: 10,
+                        name: 'James Brown',
+                        subject: 'Computer Science',
+                        points: '1,420',
+                        imageUrl: 'https://picsum.photos/200/200?random=22',
+                      ),
+                    ]),
+                  ),
+
+                  // Load More Button
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.primaryColor,
+                                theme.primaryColor.withOpacity(0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.primaryColor.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () {},
+                            icon: const Icon(
+                              Icons.expand_more,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              'View Full Leaderboard',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTopLeader(
+  Widget _buildPodiumPosition(
     BuildContext context, {
     required int position,
     required String name,
     required String subject,
     required String points,
     required String imageUrl,
+    required double height,
     bool isFirst = false,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     Color positionColor;
+    List<Color> gradientColors;
     switch (position) {
       case 1:
         positionColor = Colors.amber;
+        gradientColors = [Colors.amber, Colors.orange];
         break;
       case 2:
-        positionColor = Colors.blueGrey;
+        positionColor = Colors.grey[400]!;
+        gradientColors = [Colors.grey[400]!, Colors.grey[500]!];
         break;
       case 3:
         positionColor = Colors.brown;
+        gradientColors = [Colors.brown, Colors.brown[400]!];
         break;
       default:
         positionColor = Colors.grey;
+        gradientColors = [Colors.grey, Colors.grey[600]!];
     }
 
     return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Container(
-          width: isFirst ? 100 : 80,
-          height: isFirst ? 100 : 80,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: isFirst ? Border.all(color: Colors.amber, width: 3) : null,
-          ),
-          child: Stack(
-            children: [
-              CircleAvatar(
-                radius: isFirst ? 50 : 40,
+        // Avatar with position badge
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: isFirst ? 80 : 70,
+              height: isFirst ? 80 : 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: positionColor,
+                  width: isFirst ? 3 : 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: positionColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: isFirst ? 40 : 35,
                 backgroundImage: NetworkImage(imageUrl),
               ),
-              Positioned(
-                bottom: 0,
-                right: 0,
+            ),
+            Positioned(
+              bottom: -8,
+              left: 0,
+              right: 0,
+              child: Center(
                 child: Container(
-                  width: 30,
-                  height: 30,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: gradientColors),
                     shape: BoxShape.circle,
-                    color: positionColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: positionColor.withOpacity(0.4),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Center(
                     child: Text(
                       position.toString(),
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
                   ),
                 ),
               ),
+            ),
+            if (isFirst)
+              Positioned(
+                top: -10,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Icon(
+                    Icons.workspace_premium,
+                    color: Colors.amber,
+                    size: 24,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Podium
+        Container(
+          width: isFirst ? 120 : 90,
+          height: height,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                gradientColors.first.withOpacity(0.8),
+                gradientColors.last.withOpacity(0.6),
+              ],
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: positionColor.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
             ],
           ),
-        ),
-        SizedBox(height: 10),
-        Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
-        Text(subject, style: TextStyle(fontSize: 12, color: Colors.grey)),
-        SizedBox(height: 5),
-        Text(
-          points,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).primaryColor,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  name.split(' ').first,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: isFirst ? 18 : 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subject,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: isFirst ? 12 : 10,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    points,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: isFirst ? 12 : 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLeaderboardItem(
+  Widget _buildModernLeaderboardItem(
     BuildContext context, {
     required int position,
     required String name,
-    required String detail,
+    required String subject,
     required String points,
     required String imageUrl,
     bool isCurrentUser = false,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    Color positionColor = Colors.grey;
+    if (position <= 3) {
+      switch (position) {
+        case 1:
+          positionColor = Colors.amber;
+          break;
+        case 2:
+          positionColor = Colors.grey[400]!;
+          break;
+        case 3:
+          positionColor = Colors.brown;
+          break;
+      }
+    }
+
     return Container(
-      margin: EdgeInsets.only(bottom: 10),
-      padding: EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       decoration: BoxDecoration(
         color:
             isCurrentUser
-                ? Theme.of(context).primaryColor.withOpacity(0.1)
-                : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+                ? theme.primaryColor.withOpacity(0.1)
+                : (isDark ? Colors.grey[900]?.withOpacity(0.5) : Colors.white),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color:
+              isCurrentUser
+                  ? theme.primaryColor.withOpacity(0.3)
+                  : (isDark ? Colors.grey[800]! : Colors.grey[200]!),
+          width: isCurrentUser ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color:
+                isCurrentUser
+                    ? theme.primaryColor.withOpacity(0.1)
+                    : Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            alignment: Alignment.center,
-            child: Text(
-              position.toString(),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Position
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
                 color:
                     position <= 3
-                        ? position == 1
-                            ? Colors.amber
-                            : position == 2
-                            ? Colors.blueGrey
-                            : Colors.brown
-                        : Colors.grey,
+                        ? positionColor.withOpacity(0.1)
+                        : Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  position.toString(),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: position <= 3 ? positionColor : Colors.grey,
+                  ),
+                ),
               ),
             ),
-          ),
-          SizedBox(width: 16),
-          CircleAvatar(radius: 20, backgroundImage: NetworkImage(imageUrl)),
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 16),
+
+            // Avatar
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color:
+                      isCurrentUser
+                          ? theme.primaryColor.withOpacity(0.3)
+                          : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+              child: CircleAvatar(
+                radius: 24,
+                backgroundImage: NetworkImage(imageUrl),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Name and Subject
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color:
+                              isCurrentUser
+                                  ? theme.primaryColor
+                                  : (isDark
+                                      ? Colors.white
+                                      : const Color(0xFF1A1A2E)),
+                        ),
+                      ),
+                      if (isCurrentUser) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.primaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'You',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(Icons.school, size: 14, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text(
+                        subject,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Points
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors:
+                          isCurrentUser
+                              ? [
+                                theme.primaryColor,
+                                theme.primaryColor.withOpacity(0.8),
+                              ]
+                              : [Colors.grey[300]!, Colors.grey[400]!],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    points,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isCurrentUser ? Colors.white : Colors.grey[700],
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Text(
-                  detail,
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  'points',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.grey,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
-          ),
-          Text(
-            points,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).primaryColor,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
