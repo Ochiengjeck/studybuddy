@@ -5,7 +5,7 @@ import '../../../widgets/session_card.dart';
 import '../../../widgets/stats_card.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -61,16 +61,29 @@ class HomePage extends StatelessWidget {
             ),
             SizedBox(height: 20),
             Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Upcoming Sessions',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                TextButton(onPressed: (){Navigator.push(context, MaterialPageRoute(builder: (context){
-                  return Scaffold(appBar: AppBar(),body: SessionsScreen(),);
-                },)); }, child: Text("View All.."))
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) {
+                          return Scaffold(
+                            appBar: AppBar(),
+                            body: SessionsScreen(),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                  child: Text("View All.."),
+                ),
               ],
             ),
             SizedBox(height: 10),

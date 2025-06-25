@@ -39,7 +39,7 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
     '1:00 PM',
     '2:00 PM',
     '3:00 PM',
-    '4:00 PM'
+    '4:00 PM',
   ];
   final List<String> _platforms = ['Zoom', 'Google Meet', 'Microsoft Teams'];
   final List<String> _durations = ['30 minutes', '60 minutes', '90 minutes'];
@@ -69,10 +69,9 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
+    ).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
     _animationController.forward();
   }
 
@@ -110,13 +109,10 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
     }
   }
 
-  Widget _buildAnimatedCard({required Widget child, double delay = 0}) {
+  Widget _buildAnimatedCard({required Widget child}) {
     return SlideTransition(
       position: _slideAnimation,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: child,
-      ),
+      child: FadeTransition(opacity: _fadeAnimation, child: child),
     );
   }
 
@@ -193,10 +189,7 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
                   const SizedBox(height: 4),
                   Text(
                     widget.subjects.join(' • '),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.white70),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -227,16 +220,17 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => TutorDetailsScreen(
-                      name: widget.tutorName,
-                      subjects: widget.subjects,
-                      rating: 4.9,
-                      sessions: 127,
-                      points: 1500,
-                      badges: 5,
-                      isAvailable: true,
-                      imageUrl: widget.tutorImage,
-                    ),
+                    builder:
+                        (context) => TutorDetailsScreen(
+                          name: widget.tutorName,
+                          subjects: widget.subjects,
+                          rating: 4.9,
+                          sessions: 127,
+                          points: 1500,
+                          badges: 5,
+                          isAvailable: true,
+                          imageUrl: widget.tutorImage,
+                        ),
                   ),
                 );
               },
@@ -263,11 +257,7 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
               color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: Colors.blue.shade600,
-            ),
+            child: Icon(icon, size: 20, color: Colors.blue.shade600),
           ),
           const SizedBox(width: 12),
           Text(
@@ -294,67 +284,77 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: widget.subjects.map((subject) {
-                final isSelected = _selectedSubject == subject;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedSubject = subject;
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.blue.shade600 : Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                      border: Border.all(
-                        color: isSelected
-                            ? Colors.blue.shade600
-                            : Colors.grey.shade300,
-                        width: 2,
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: Colors.blue.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isSelected ? Icons.check_circle : Icons.school,
-                          size: 18,
-                          color: isSelected ? Colors.white : Colors.blue.shade600,
+              children:
+                  widget.subjects.map((subject) {
+                    final isSelected = _selectedSubject == subject;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedSubject = subject;
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          subject,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey[800],
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                        decoration: BoxDecoration(
+                          color:
+                              isSelected ? Colors.blue.shade600 : Colors.white,
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(
+                            color:
+                                isSelected
+                                    ? Colors.blue.shade600
+                                    : Colors.grey.shade300,
+                            width: 2,
                           ),
+                          boxShadow:
+                              isSelected
+                                  ? [
+                                    BoxShadow(
+                                      color: Colors.blue.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                  : [
+                                    BoxShadow(
+                                      color: Colors.grey.withOpacity(0.1),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isSelected ? Icons.check_circle : Icons.school,
+                              size: 18,
+                              color:
+                                  isSelected
+                                      ? Colors.white
+                                      : Colors.blue.shade600,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              subject,
+                              style: TextStyle(
+                                color:
+                                    isSelected
+                                        ? Colors.white
+                                        : Colors.grey[800],
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
             ),
           ],
         ),
@@ -387,23 +387,26 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _selectedDate != null
-                      ? Colors.blue.shade50
-                      : Colors.grey.shade50,
+                  color:
+                      _selectedDate != null
+                          ? Colors.blue.shade50
+                          : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _selectedDate != null
-                        ? Colors.blue.shade300
-                        : Colors.grey.shade300,
+                    color:
+                        _selectedDate != null
+                            ? Colors.blue.shade300
+                            : Colors.grey.shade300,
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Icons.calendar_today,
-                      color: _selectedDate != null
-                          ? Colors.blue.shade600
-                          : Colors.grey,
+                      color:
+                          _selectedDate != null
+                              ? Colors.blue.shade600
+                              : Colors.grey,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -413,12 +416,14 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
                             : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
                         style: TextStyle(
                           fontSize: 16,
-                          color: _selectedDate != null
-                              ? Colors.blue.shade800
-                              : Colors.grey,
-                          fontWeight: _selectedDate != null
-                              ? FontWeight.w600
-                              : FontWeight.normal,
+                          color:
+                              _selectedDate != null
+                                  ? Colors.blue.shade800
+                                  : Colors.grey,
+                          fontWeight:
+                              _selectedDate != null
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
                         ),
                       ),
                     ),
@@ -446,40 +451,46 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _availableTimes.map((time) {
-                  final isSelected = _selectedTime == time;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedTime = time;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.blue.shade600 : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? Colors.blue.shade600
-                              : Colors.grey.shade300,
+                children:
+                    _availableTimes.map((time) {
+                      final isSelected = _selectedTime == time;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedTime = time;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                isSelected
+                                    ? Colors.blue.shade600
+                                    : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? Colors.blue.shade600
+                                      : Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Text(
+                            time,
+                            style: TextStyle(
+                              color:
+                                  isSelected ? Colors.white : Colors.grey[700],
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        time,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                          fontWeight: FontWeight.w500,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
               ),
             ],
           ],
@@ -518,56 +529,61 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
             ),
             const SizedBox(height: 12),
             Row(
-              children: _platforms.map((platform) {
-                final isSelected = _selectedPlatform == platform;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedPlatform = platform;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? _platformColors[platform]!
-                            : Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? _platformColors[platform]!
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            _platformIcons[platform],
-                            color: isSelected
-                                ? Colors.white
-                                : _platformColors[platform],
-                            size: 20,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            platform.split(' ').first,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? Colors.white
-                                  : Colors.grey[700],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+              children:
+                  _platforms.map((platform) {
+                    final isSelected = _selectedPlatform == platform;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedPlatform = platform;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color:
+                                isSelected
+                                    ? _platformColors[platform]!
+                                    : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? _platformColors[platform]!
+                                      : Colors.grey.shade300,
                             ),
                           ),
-                        ],
+                          child: Column(
+                            children: [
+                              Icon(
+                                _platformIcons[platform],
+                                color:
+                                    isSelected
+                                        ? Colors.white
+                                        : _platformColors[platform],
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                platform.split(' ').first,
+                                style: TextStyle(
+                                  color:
+                                      isSelected
+                                          ? Colors.white
+                                          : Colors.grey[700],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
             ),
             const SizedBox(height: 20),
             // Duration Selection
@@ -581,53 +597,60 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
             ),
             const SizedBox(height: 12),
             Row(
-              children: _durations.map((duration) {
-                final isSelected = _selectedDuration == duration;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedDuration = duration;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Colors.orange.shade500
-                            : Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? Colors.orange.shade500
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            color: isSelected ? Colors.white : Colors.orange,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            duration.split(' ').first,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.grey[700],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+              children:
+                  _durations.map((duration) {
+                    final isSelected = _selectedDuration == duration;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedDuration = duration;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color:
+                                isSelected
+                                    ? Colors.orange.shade500
+                                    : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? Colors.orange.shade500
+                                      : Colors.grey.shade300,
                             ),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                color:
+                                    isSelected ? Colors.white : Colors.orange,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                duration.split(' ').first,
+                                style: TextStyle(
+                                  color:
+                                      isSelected
+                                          ? Colors.white
+                                          : Colors.grey[700],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
             ),
             const SizedBox(height: 20),
             // Description
@@ -643,7 +666,10 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
                 ),
-                prefixIcon: Icon(Icons.description, color: Colors.blue.shade600),
+                prefixIcon: Icon(
+                  Icons.description,
+                  color: Colors.blue.shade600,
+                ),
               ),
               onChanged: (value) {
                 _sessionDescription = value;
@@ -656,7 +682,8 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
   }
 
   Widget _buildBookButton() {
-    final isFormValid = _selectedSubject != null &&
+    final isFormValid =
+        _selectedSubject != null &&
         _selectedDate != null &&
         _selectedTime != null;
 
@@ -678,29 +705,30 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
               elevation: isFormValid ? 8 : 2,
               shadowColor: Colors.blue.withOpacity(0.3),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.check_circle_outline, size: 20),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Confirm Booking',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
                       ),
-                    ],
-                  ),
+                    )
+                    : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.check_circle_outline, size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Confirm Booking',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         ),
       ),
@@ -719,18 +747,20 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => BookingDetailsScreen(
-            sessionTitle: _selectedSubject!,
-            tutorName: widget.tutorName,
-            tutorImage: widget.tutorImage,
-            platform: _selectedPlatform,
-            dateTime:
-                '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year} at $_selectedTime',
-            duration: _selectedDuration,
-            description: _sessionDescription.isEmpty
-                ? 'No specific description provided'
-                : _sessionDescription,
-          ),
+          builder:
+              (context) => BookingDetailsScreen(
+                sessionTitle: _selectedSubject!,
+                tutorName: widget.tutorName,
+                tutorImage: widget.tutorImage,
+                platform: _selectedPlatform,
+                dateTime:
+                    '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year} at $_selectedTime',
+                duration: _selectedDuration,
+                description:
+                    _sessionDescription.isEmpty
+                        ? 'No specific description provided'
+                        : _sessionDescription,
+              ),
         ),
       );
 

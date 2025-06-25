@@ -3,7 +3,7 @@ import 'dart:async';
 
 // Enhanced Practice Tests Page with Filtering and Sorting
 class PracticeTestsPage extends StatefulWidget {
-  const PracticeTestsPage({Key? key}) : super(key: key);
+  const PracticeTestsPage({super.key});
 
   @override
   _PracticeTestsPageState createState() => _PracticeTestsPageState();
@@ -13,10 +13,21 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
   String _selectedSubject = 'All';
   String _selectedDifficulty = 'All';
   String _sortBy = 'Name';
-  
-  final List<String> _subjects = ['All', 'Mathematics', 'Chemistry', 'Computer Science', 'English'];
+
+  final List<String> _subjects = [
+    'All',
+    'Mathematics',
+    'Chemistry',
+    'Computer Science',
+    'English',
+  ];
   final List<String> _difficulties = ['All', 'Easy', 'Medium', 'Hard'];
-  final List<String> _sortOptions = ['Name', 'Difficulty', 'Progress', 'Questions'];
+  final List<String> _sortOptions = [
+    'Name',
+    'Difficulty',
+    'Progress',
+    'Questions',
+  ];
 
   final List<Map<String, dynamic>> _allTests = [
     {
@@ -27,7 +38,8 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
       'difficulty': 'Medium',
       'completion': 0.4,
       'totalMarks': 100,
-      'description': 'Test your understanding of calculus basics including limits, derivatives, and integrals.',
+      'description':
+          'Test your understanding of calculus basics including limits, derivatives, and integrals.',
     },
     {
       'title': 'Organic Chemistry',
@@ -37,7 +49,8 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
       'difficulty': 'Hard',
       'completion': 0.8,
       'totalMarks': 80,
-      'description': 'Advanced organic chemistry concepts including reactions and mechanisms.',
+      'description':
+          'Advanced organic chemistry concepts including reactions and mechanisms.',
     },
     {
       'title': 'Python Basics',
@@ -57,16 +70,21 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
       'difficulty': 'Medium',
       'completion': 0.0,
       'totalMarks': 40,
-      'description': 'Analyze literary works and understand various literary devices.',
+      'description':
+          'Analyze literary works and understand various literary devices.',
     },
   ];
 
   List<Map<String, dynamic>> get _filteredAndSortedTests {
-    List<Map<String, dynamic>> filtered = _allTests.where((test) {
-      bool subjectMatch = _selectedSubject == 'All' || test['subject'] == _selectedSubject;
-      bool difficultyMatch = _selectedDifficulty == 'All' || test['difficulty'] == _selectedDifficulty;
-      return subjectMatch && difficultyMatch;
-    }).toList();
+    List<Map<String, dynamic>> filtered =
+        _allTests.where((test) {
+          bool subjectMatch =
+              _selectedSubject == 'All' || test['subject'] == _selectedSubject;
+          bool difficultyMatch =
+              _selectedDifficulty == 'All' ||
+              test['difficulty'] == _selectedDifficulty;
+          return subjectMatch && difficultyMatch;
+        }).toList();
 
     filtered.sort((a, b) {
       switch (_sortBy) {
@@ -74,7 +92,9 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
           return a['title'].compareTo(b['title']);
         case 'Difficulty':
           List<String> difficultyOrder = ['Easy', 'Medium', 'Hard'];
-          return difficultyOrder.indexOf(a['difficulty']).compareTo(difficultyOrder.indexOf(b['difficulty']));
+          return difficultyOrder
+              .indexOf(a['difficulty'])
+              .compareTo(difficultyOrder.indexOf(b['difficulty']));
         case 'Progress':
           return b['completion'].compareTo(a['completion']);
         case 'Questions':
@@ -100,18 +120,24 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
                 _sortBy = value;
               });
             },
-            itemBuilder: (context) => _sortOptions.map((option) {
-              return PopupMenuItem(
-                value: option,
-                child: Row(
-                  children: [
-                    Icon(_sortBy == option ? Icons.check : Icons.sort_by_alpha),
-                    SizedBox(width: 8),
-                    Text('Sort by $option'),
-                  ],
-                ),
-              );
-            }).toList(),
+            itemBuilder:
+                (context) =>
+                    _sortOptions.map((option) {
+                      return PopupMenuItem(
+                        value: option,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _sortBy == option
+                                  ? Icons.check
+                                  : Icons.sort_by_alpha,
+                            ),
+                            SizedBox(width: 8),
+                            Text('Sort by $option'),
+                          ],
+                        ),
+                      );
+                    }).toList(),
           ),
         ],
       ),
@@ -148,11 +174,18 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
               decoration: InputDecoration(
                 labelText: 'Subject',
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
-              items: _subjects.map((subject) {
-                return DropdownMenuItem(value: subject, child: Text(subject));
-              }).toList(),
+              items:
+                  _subjects.map((subject) {
+                    return DropdownMenuItem(
+                      value: subject,
+                      child: Text(subject),
+                    );
+                  }).toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedSubject = value!;
@@ -167,11 +200,18 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
               decoration: InputDecoration(
                 labelText: 'Difficulty',
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
-              items: _difficulties.map((difficulty) {
-                return DropdownMenuItem(value: difficulty, child: Text(difficulty));
-              }).toList(),
+              items:
+                  _difficulties.map((difficulty) {
+                    return DropdownMenuItem(
+                      value: difficulty,
+                      child: Text(difficulty),
+                    );
+                  }).toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedDifficulty = value!;
@@ -207,9 +247,7 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => ExamPage(testData: test),
-            ),
+            MaterialPageRoute(builder: (context) => ExamPage(testData: test)),
           );
         },
         child: Padding(
@@ -296,10 +334,10 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
                       ),
                     );
                   },
-                  child: Text('Start Test'),
                   style: ElevatedButton.styleFrom(
                     minimumSize: Size(double.infinity, 40),
                   ),
+                  child: Text('Start Test'),
                 ),
             ],
           ),
@@ -313,7 +351,7 @@ class _PracticeTestsPageState extends State<PracticeTestsPage> {
 class ExamPage extends StatefulWidget {
   final Map<String, dynamic> testData;
 
-  const ExamPage({Key? key, required this.testData}) : super(key: key);
+  const ExamPage({super.key, required this.testData});
 
   @override
   _ExamPageState createState() => _ExamPageState();
@@ -322,7 +360,7 @@ class ExamPage extends StatefulWidget {
 class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
   late AnimationController _timerController;
   int _currentQuestionIndex = 0;
-  Map<int, String> _selectedAnswers = {};
+  final Map<int, String> _selectedAnswers = {};
   bool _isExamStarted = false;
   Duration _timeRemaining = Duration.zero;
 
@@ -340,7 +378,8 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
     // Generate sample questions based on the test
     _questions = List.generate(widget.testData['questions'], (index) {
       return {
-        'question': 'Sample question ${index + 1} for ${widget.testData['title']}?',
+        'question':
+            'Sample question ${index + 1} for ${widget.testData['title']}?',
         'options': [
           'Option A - First possible answer',
           'Option B - Second possible answer',
@@ -357,7 +396,7 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
     String durationStr = widget.testData['duration'];
     int minutes = int.parse(durationStr.split(' ')[0]);
     _timeRemaining = Duration(minutes: minutes);
-    
+
     _timerController = AnimationController(
       duration: _timeRemaining,
       vsync: this,
@@ -393,47 +432,48 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
         correctAnswers++;
       }
     }
-    
+
     double percentage = (correctAnswers / _questions.length) * 100;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text('Exam Completed!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              percentage >= 70 ? Icons.check_circle : Icons.cancel,
-              size: 64,
-              color: percentage >= 70 ? Colors.green : Colors.red,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Exam Completed!'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  percentage >= 70 ? Icons.check_circle : Icons.cancel,
+                  size: 64,
+                  color: percentage >= 70 ? Colors.green : Colors.red,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Score: ${percentage.toStringAsFixed(1)}%',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                Text('$correctAnswers out of ${_questions.length} correct'),
+              ],
             ),
-            SizedBox(height: 16),
-            Text(
-              'Score: ${percentage.toStringAsFixed(1)}%',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            Text('$correctAnswers out of ${_questions.length} correct'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            child: Text('Back to Tests'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
+                },
+                child: Text('Back to Tests'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _restartExam();
+                },
+                child: Text('Retake'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _restartExam();
-            },
-            child: Text('Retake'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -458,7 +498,7 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
     if (!_isExamStarted) {
       return _buildExamInstructions();
     }
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.testData['title']),
@@ -472,7 +512,10 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
             ),
             child: Text(
               '${_timeRemaining.inMinutes}:${(_timeRemaining.inSeconds % 60).toString().padLeft(2, '0')}',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -489,9 +532,7 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
 
   Widget _buildExamInstructions() {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.testData['title']),
-      ),
+      appBar: AppBar(title: Text(widget.testData['title'])),
       body: Padding(
         padding: EdgeInsets.all(24),
         child: Column(
@@ -504,7 +545,9 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
             SizedBox(height: 24),
             _buildInstructionItem('Duration: ${widget.testData['duration']}'),
             _buildInstructionItem('Questions: ${widget.testData['questions']}'),
-            _buildInstructionItem('Total Marks: ${widget.testData['totalMarks']}'),
+            _buildInstructionItem(
+              'Total Marks: ${widget.testData['totalMarks']}',
+            ),
             _buildInstructionItem('Passing Score: 70%'),
             SizedBox(height: 24),
             Text(
@@ -512,7 +555,9 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 16),
-            _buildRuleItem('You cannot go back to previous questions once submitted'),
+            _buildRuleItem(
+              'You cannot go back to previous questions once submitted',
+            ),
             _buildRuleItem('The exam will auto-submit when time runs out'),
             _buildRuleItem('Make sure you have a stable internet connection'),
             _buildRuleItem('Do not refresh the page during the exam'),
@@ -531,11 +576,11 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
             SizedBox(height: 24),
             ElevatedButton(
               onPressed: _startExam,
-              child: Text('Start Exam'),
               style: ElevatedButton.styleFrom(
                 minimumSize: Size(double.infinity, 50),
                 textStyle: TextStyle(fontSize: 18),
               ),
+              child: Text('Start Exam'),
             ),
           ],
         ),
@@ -565,7 +610,10 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
           Icon(Icons.circle, size: 8, color: Colors.grey),
           SizedBox(width: 12),
           Expanded(
-            child: Text(text, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            ),
           ),
         ],
       ),
@@ -580,7 +628,9 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Question ${_currentQuestionIndex + 1} of ${_questions.length}'),
+              Text(
+                'Question ${_currentQuestionIndex + 1} of ${_questions.length}',
+              ),
               Text('${_selectedAnswers.length}/${_questions.length} answered'),
             ],
           ),
@@ -597,7 +647,7 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
 
   Widget _buildQuestionContent() {
     final question = _questions[_currentQuestionIndex];
-    
+
     return Padding(
       padding: EdgeInsets.all(16),
       child: Column(
@@ -644,18 +694,23 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
           if (_currentQuestionIndex > 0) SizedBox(width: 16),
           Expanded(
             child: ElevatedButton(
-              onPressed: _selectedAnswers.containsKey(_currentQuestionIndex)
-                  ? () {
-                      if (_currentQuestionIndex < _questions.length - 1) {
-                        setState(() {
-                          _currentQuestionIndex++;
-                        });
-                      } else {
-                        _showSubmitDialog();
+              onPressed:
+                  _selectedAnswers.containsKey(_currentQuestionIndex)
+                      ? () {
+                        if (_currentQuestionIndex < _questions.length - 1) {
+                          setState(() {
+                            _currentQuestionIndex++;
+                          });
+                        } else {
+                          _showSubmitDialog();
+                        }
                       }
-                    }
-                  : null,
-              child: Text(_currentQuestionIndex < _questions.length - 1 ? 'Next' : 'Submit'),
+                      : null,
+              child: Text(
+                _currentQuestionIndex < _questions.length - 1
+                    ? 'Next'
+                    : 'Submit',
+              ),
             ),
           ),
         ],
@@ -666,26 +721,27 @@ class _ExamPageState extends State<ExamPage> with TickerProviderStateMixin {
   void _showSubmitDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Submit Exam'),
-        content: Text(
-          'Are you sure you want to submit your exam? '
-          'You have answered ${_selectedAnswers.length} out of ${_questions.length} questions.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: Text('Submit Exam'),
+            content: Text(
+              'Are you sure you want to submit your exam? '
+              'You have answered ${_selectedAnswers.length} out of ${_questions.length} questions.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _submitExam();
+                },
+                child: Text('Submit'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _submitExam();
-            },
-            child: Text('Submit'),
-          ),
-        ],
-      ),
     );
   }
 }

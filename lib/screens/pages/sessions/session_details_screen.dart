@@ -23,7 +23,7 @@ class SessionDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: const Text('Session Details'),
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -271,7 +271,9 @@ class SessionDetailsScreen extends StatelessWidget {
                                       ),
                                       child: const Text(
                                         '127+ sessions',
-                                        softWrap: true,overflow: TextOverflow.ellipsis,maxLines: 1,
+                                        softWrap: true,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.blue,
@@ -855,25 +857,23 @@ class SessionDetailsScreen extends StatelessWidget {
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        ...items
-            .map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('• ', style: TextStyle(fontSize: 16)),
-                    Expanded(
-                      child: Text(
-                        item,
-                        style: const TextStyle(fontSize: 15, height: 1.4),
-                      ),
-                    ),
-                  ],
+        ...items.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('• ', style: TextStyle(fontSize: 16)),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: const TextStyle(fontSize: 15, height: 1.4),
+                  ),
                 ),
-              ),
-            )
-            .toList(),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:studybuddy/screens/pages/index.dart';
+import 'package:provider/provider.dart';
+import 'package:studybuddy/utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../../utils/providers/providers.dart';
+import '../pages/index.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
@@ -15,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
-  bool _isLoading = false;
   bool _obscurePassword = true;
 
   @override
@@ -23,6 +25,44 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogin(BuildContext context) async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+
+    try {
+      final response = await authProvider.login(
+        LoginRequest(
+          email: _emailController.text,
+          password: _passwordController.text,
+        ),
+      );
+
+      if (response.success && response.data != null) {
+        // appProvider.setAuthToken(response.data!.token);
+        appProvider.setCurrentUser(response.data!);
+
+        // Navigating to home screen after successful login
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => Index()),
+        );
+      }
+    } on ApiError catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -50,9 +90,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: size.height * 0.05),
-                    _buildWelcomeSection(theme),
+                    _buildHeaderSection(theme),
                     SizedBox(height: size.height * 0.05),
-                    _buildLoginForm(theme),
+                    _buildLoginForm(theme, context),
                     const Spacer(),
                     _buildSignUpLink(theme),
                   ],
@@ -65,22 +105,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildWelcomeSection(ThemeData theme) {
+  Widget _buildHeaderSection(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: theme.colorScheme.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Image.asset("assets/logo.png", height: 100, fit: BoxFit.cover),
-          // Icon(
-          //   Icons.school_rounded,
-          //   size: 48,
-          //   color: theme.colorScheme.primary,
-          // ),
         ),
         const SizedBox(height: 24),
         Text(
@@ -101,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildLoginForm(ThemeData theme) {
+  Widget _buildLoginForm(ThemeData theme, BuildContext context) {
     return Form(
       key: _formKey,
       child: Column(
@@ -112,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 16),
           _buildRememberMeRow(theme),
           const SizedBox(height: 32),
-          _buildSignInButton(theme),
+          _buildSignInButton(theme, context),
           const SizedBox(height: 24),
           _buildDivider(theme),
           const SizedBox(height: 24),
@@ -136,38 +171,11 @@ class _LoginScreenState extends State<LoginScreen> {
         TextFormField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your email';
-            }
-            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Please enter a valid email';
-            }
-            return null;
-          },
-          decoration: InputDecoration(
+          validator: _validateEmail,
+          decoration: _inputDecoration(
+            theme,
             hintText: 'Enter your email',
-            prefixIcon: Icon(
-              Icons.email_outlined,
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-            ),
-            filled: true,
-            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: theme.colorScheme.primary,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: theme.colorScheme.error),
-            ),
+            prefixIcon: Icons.email_outlined,
           ),
         ),
       ],
@@ -188,47 +196,19 @@ class _LoginScreenState extends State<LoginScreen> {
         TextFormField(
           controller: _passwordController,
           obscureText: _obscurePassword,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your password';
-            }
-            if (value.length < 6) {
-              return 'Password must be at least 6 characters';
-            }
-            return null;
-          },
-          decoration: InputDecoration(
+          validator: _validatePassword,
+          decoration: _inputDecoration(
+            theme,
             hintText: 'Enter your password',
-            prefixIcon: Icon(
-              Icons.lock_outlined,
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-            ),
+            prefixIcon: Icons.lock_outlined,
             suffixIcon: IconButton(
               icon: Icon(
                 _obscurePassword
                     ? Icons.visibility_outlined
                     : Icons.visibility_off_outlined,
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
               ),
               onPressed:
                   () => setState(() => _obscurePassword = !_obscurePassword),
-            ),
-            filled: true,
-            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: theme.colorScheme.primary,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: theme.colorScheme.error),
             ),
           ),
         ),
@@ -260,13 +240,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         TextButton(
-          child: Text(
-            'Forgot Password?',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
           onPressed:
               () => Navigator.push(
                 context,
@@ -274,23 +247,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   builder: (context) => const ForgotPasswordScreen(),
                 ),
               ),
+          child: Text(
+            'Forgot Password?',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSignInButton(ThemeData theme) {
+  Widget _buildSignInButton(ThemeData theme, BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed:
-            _isLoading
-                ? null
-                : () {
-                  if (_formKey.currentState!.validate()) {
-                    _login();
-                  }
-                },
+        onPressed: authProvider.isLoading ? null : () => _handleLogin(context),
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.colorScheme.primary,
           foregroundColor: theme.colorScheme.onPrimary,
@@ -301,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
           elevation: 0,
         ),
         child:
-            _isLoading
+            authProvider.isLoading
                 ? SizedBox(
                   width: 24,
                   height: 24,
@@ -393,32 +368,53 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _login() async {
-    setState(() => _isLoading = true);
-    try {
-      await Future.delayed(const Duration(seconds: 3));
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => Index()),
-      );
-      // TODO: Implement actual login logic
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
-            // backgroundColor: theme.colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  InputDecoration _inputDecoration(
+    ThemeData theme, {
+    required String hintText,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      prefixIcon: Icon(
+        prefixIcon,
+        color: theme.colorScheme.onSurface.withOpacity(0.6),
+      ),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: theme.colorScheme.error),
+      ),
+    );
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter your email';
     }
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+      return 'Please enter a valid email';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter your password';
+    }
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+    return null;
   }
 }

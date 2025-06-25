@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../widgets/custom_button.dart';
-import '../../../widgets/custom_text_field.dart';
-
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({Key? key}) : super(key: key);
+  const SettingsPage({super.key});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();

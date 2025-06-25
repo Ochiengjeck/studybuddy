@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class LeaderboardPage extends StatefulWidget {
-  const LeaderboardPage({Key? key}) : super(key: key);
+  const LeaderboardPage({super.key});
 
   @override
   State<LeaderboardPage> createState() => _LeaderboardPageState();

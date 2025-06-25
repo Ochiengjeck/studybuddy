@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:studybuddy/screens/pages/index.dart';
+import '../../utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../../utils/providers/providers.dart';
 import 'log_in.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -11,21 +14,76 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleRegistration(BuildContext context) async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+
+    String fullName = nameController.text.trim();
+    List<String> nameParts = fullName.split(' ');
+
+    // Initialize variables for firstName and lastName
+    String firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+    String lastName =
+        nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await authProvider.register(
+        RegisterRequest(
+          email: emailController.text,
+          password: passwordController.text,
+          confirmPassword: confirmPasswordController.text,
+          firstName: firstName,
+          lastName: lastName,
+          phone: '', // You can add a phone field if needed
+        ),
+      );
+
+      if (response.success && response.data != null) {
+        // Save the auth token and user data
+        appProvider.setAuthToken(response.data!.authToken ?? '');
+        appProvider.setCurrentUser(response.data!);
+
+        // Navigating to home screen after successful registration
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => Index()),
+        );
+      }
+    } on ApiError catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -117,7 +175,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 20),
           _buildConfirmPasswordField(theme),
           const SizedBox(height: 32),
-          _buildSignUpButton(theme),
+          _buildSignUpButton(theme, context),
           const SizedBox(height: 24),
           _buildDivider(theme),
           const SizedBox(height: 24),
@@ -139,7 +197,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         TextFormField(
-          controller: _nameController,
+          controller: nameController,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please enter your name';
@@ -153,7 +211,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
             filled: true,
-            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(
+              0.3,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
@@ -187,7 +247,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         TextFormField(
-          controller: _emailController,
+          controller: emailController,
           keyboardType: TextInputType.emailAddress,
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -205,7 +265,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
             filled: true,
-            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(
+              0.3,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
@@ -239,7 +301,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         TextFormField(
-          controller: _passwordController,
+          controller: passwordController,
           obscureText: _obscurePassword,
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -267,7 +329,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   () => setState(() => _obscurePassword = !_obscurePassword),
             ),
             filled: true,
-            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(
+              0.3,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
@@ -301,13 +365,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         TextFormField(
-          controller: _confirmPasswordController,
+          controller: confirmPasswordController,
           obscureText: _obscureConfirmPassword,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please confirm your password';
             }
-            if (value != _passwordController.text) {
+            if (value != passwordController.text) {
               return 'Passwords do not match';
             }
             return null;
@@ -331,7 +395,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
             ),
             filled: true,
-            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(
+              0.3,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
@@ -353,18 +419,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildSignUpButton(ThemeData theme) {
+  Widget _buildSignUpButton(ThemeData theme, BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed:
-            _isLoading
-                ? null
-                : () {
-                  if (_formKey.currentState!.validate()) {
-                    _register();
-                  }
-                },
+            authProvider.isLoading ? null : () => _handleRegistration(context),
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.colorScheme.primary,
           foregroundColor: theme.colorScheme.onPrimary,
@@ -375,7 +437,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           elevation: 0,
         ),
         child:
-            _isLoading
+            authProvider.isLoading
                 ? SizedBox(
                   width: 24,
                   height: 24,
