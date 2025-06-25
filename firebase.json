@@ -1,8 +1,1 @@
-{
-  "firestore": {
-    "database": "(default)",
-    "location": "africa-south1",
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  }
-}
+{"firestore":{"database":"(default)","location":"africa-south1","rules":"firestore.rules","indexes":"firestore.indexes.json"},"flutter":{"platforms":{"android":{"default":{"projectId":"studybuddy-6d90b","appId":"1:132617993405:android:a29817a88e815e4f704bd4","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"studybuddy-6d90b","configurations":{"android":"1:132617993405:android:a29817a88e815e4f704bd4","web":"1:132617993405:web:9da324f3fa09c2eb704bd4","windows":"1:132617993405:web:899cc10116d8a4ae704bd4"}}}}}}

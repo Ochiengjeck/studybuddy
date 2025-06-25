@@ -1,7 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:studybuddy/utils/modelsAndRepsositories/models_and_repositories.dart';
-import '../../utils/providers/providers.dart';
+import 'package:studybuddy/utils/providers/providers.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:google_sign_in/google_sign_in.dart';
 import '../pages/index.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
@@ -36,25 +39,22 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final response = await authProvider.login(
         LoginRequest(
-          email: _emailController.text,
+          email: _emailController.text.trim(),
           password: _passwordController.text,
         ),
       );
 
       if (response.success && response.data != null) {
-        // appProvider.setAuthToken(response.data!.token);
         appProvider.setCurrentUser(response.data!);
-
-        // Navigating to home screen after successful login
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => Index()),
+          MaterialPageRoute(builder: (context) => IndexPage()),
         );
       }
     } on ApiError catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message),
+          content: Text(_errorMessage(e)),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Theme.of(context).colorScheme.error,
           shape: RoundedRectangleBorder(
@@ -62,6 +62,110 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       );
+    }
+  }
+
+  // Future<void> _handleGoogleSignIn(BuildContext context) async {
+  //   final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  //   final appProvider = Provider.of<AppProvider>(context, listen: false);
+
+  //   try {
+  //     final googleSignIn = GoogleSignIn();
+  //     final googleUser = await googleSignIn.signIn();
+
+  //     if (googleUser == null) {
+  //       // User cancelled sign-in
+  //       return;
+  //     }
+
+  //     final googleAuth = await googleUser.authentication;
+
+  //     final credential = auth.GoogleAuthProvider.credential(
+  //       accessToken: googleAuth.accessToken,
+  //       idToken: googleAuth.idToken,
+  //     );
+
+  //     final authResult = await FirebaseConfig.firebaseAuth.signInWithCredential(
+  //       credential,
+  //     );
+
+  //     final user = authResult.user;
+  //     if (user == null) {
+  //       throw Exception('Failed to retrieve user from Google Sign-In.');
+  //     }
+
+  //     final userDoc =
+  //         await FirebaseConfig.firestore
+  //             .collection('users')
+  //             .doc(user.uid)
+  //             .get();
+
+  //     final userData =
+  //         userDoc.exists
+  //             ? User.fromJson({
+  //               ...userDoc.data()!,
+  //               'id': user.uid,
+  //               'email': user.email,
+  //               'is_verified': user.emailVerified,
+  //             })
+  //             : await _createUserFromGoogle(user);
+
+  //     appProvider.setCurrentUser(userData);
+
+  //     if (!context.mounted) return;
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(builder: (context) => PagesIndex()),
+  //     );
+  //   } catch (e) {
+  //     if (!context.mounted) return;
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text('Google Sign-In failed: ${e.toString()}'),
+  //         behavior: SnackBarBehavior.floating,
+  //         backgroundColor: Theme.of(context).colorScheme.error,
+  //         shape: RoundedRectangleBorder(
+  //           borderRadius: BorderRadius.circular(12),
+  //         ),
+  //       ),
+  //     );
+  //   }
+  // }
+
+  Future<User> _createUserFromGoogle(auth.User firebaseUser) async {
+    final userData = {
+      'email': firebaseUser.email,
+      'first_name': firebaseUser.displayName?.split(' ').first,
+      'last_name': firebaseUser.displayName?.split(' ').skip(1).join(' '),
+      'phone': firebaseUser.phoneNumber,
+      'is_active': true,
+      'is_verified': firebaseUser.emailVerified,
+      'date_joined': Timestamp.now(),
+      'user_type': 'student',
+    };
+
+    await FirebaseConfig.firestore
+        .collection('users')
+        .doc(firebaseUser.uid)
+        .set(userData);
+
+    return User.fromJson({...userData, 'id': firebaseUser.uid});
+  }
+
+  String _errorMessage(ApiError error) {
+    switch (error.code?.toLowerCase()) {
+      case 'user-not-found':
+        return 'No user found with this email';
+      case 'wrong-password':
+        return 'Invalid password';
+      case 'invalid-email':
+        return 'Invalid email format';
+      case 'email-already-in-use':
+        return 'This email is already registered';
+      case 'weak-password':
+        return 'Password is too weak';
+      default:
+        return error.message;
     }
   }
 
@@ -151,7 +255,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 24),
           _buildDivider(theme),
           const SizedBox(height: 24),
-          _buildGoogleSignInButton(theme),
+          _buildGoogleSignInButton(theme, context),
         ],
       ),
     );
@@ -318,7 +422,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildGoogleSignInButton(ThemeData theme) {
+  Widget _buildGoogleSignInButton(ThemeData theme, BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
@@ -337,6 +441,7 @@ class _LoginScreenState extends State<LoginScreen> {
           side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3)),
         ),
         onPressed: () {},
+        // onPressed: () => _handleGoogleSignIn(context),
       ),
     );
   }

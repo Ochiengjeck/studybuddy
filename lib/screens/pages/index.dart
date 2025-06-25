@@ -14,15 +14,15 @@ import 'package:studybuddy/screens/pages/tutors/tutors_screen.dart';
 // import 'package:studybuddy/widgets/bottom_navigation_bar.dart';
 import 'package:studybuddy/widgets/drawer.dart';
 
-class Index extends StatefulWidget {
-  const Index({super.key});
+class IndexPage extends StatefulWidget {
+  const IndexPage({super.key});
 
   @override
-  State<Index> createState() => _IndexState();
+  State<IndexPage> createState() => _IndexPageState();
 }
 
-class _IndexState extends State<Index> with TickerProviderStateMixin {
-  int _currentIndex = 0;
+class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
+  int _currentIndexPage = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -62,10 +62,10 @@ class _IndexState extends State<Index> with TickerProviderStateMixin {
   }
 
   void _navigateToScreen(int index) {
-    if (index != _currentIndex) {
+    if (index != _currentIndexPage) {
       _fadeController.reset();
       setState(() {
-        _currentIndex = index;
+        _currentIndexPage = index;
       });
       _fadeController.forward();
     }
@@ -349,7 +349,7 @@ class _IndexState extends State<Index> with TickerProviderStateMixin {
       key: _scaffoldKey,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: CustomDrawer(
-        currentIndex: _currentIndex,
+        currentIndex: _currentIndexPage,
         onItemSelected: _navigateToScreen,
       ),
       appBar: _buildModernAppBar(context),
@@ -358,13 +358,13 @@ class _IndexState extends State<Index> with TickerProviderStateMixin {
         builder: (context, child) {
           return FadeTransition(
             opacity: _fadeAnimation,
-            child: IndexedStack(index: _currentIndex, children: screens),
+            child: IndexedStack(index: _currentIndexPage, children: screens),
           );
         },
       ),
       // Uncomment if you want to use bottom navigation
       // bottomNavigationBar: CustomBottomNavigationBar(
-      //   currentIndex: _currentIndex,
+      //   currentIndexPage: _currentIndexPage,
       //   onTap: _navigateToScreen,
       // ),
     );
@@ -405,15 +405,15 @@ class _IndexState extends State<Index> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _getAppBarTitle(_currentIndex),
+                  _getAppBarTitle(_currentIndexPage),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).textTheme.titleLarge?.color,
                   ),
                 ),
-                if (_getAppBarSubtitle(_currentIndex).isNotEmpty)
+                if (_getAppBarSubtitle(_currentIndexPage).isNotEmpty)
                   Text(
-                    _getAppBarSubtitle(_currentIndex),
+                    _getAppBarSubtitle(_currentIndexPage),
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
@@ -424,7 +424,7 @@ class _IndexState extends State<Index> with TickerProviderStateMixin {
         ],
       ),
       actions: [
-        if (_currentIndex == 3) // Messages screen
+        if (_currentIndexPage == 3) // Messages screen
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(

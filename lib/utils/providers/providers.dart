@@ -1,55 +1,46 @@
-// providers.dart
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/single_child_widget.dart';
 
 import '../modelsAndRepsositories/models_and_repositories.dart';
 
 // 1. Main App Provider
 class AppProvider extends ChangeNotifier {
-  String? _authToken;
   User? _currentUser;
   bool _isInitializing = false;
   String? _initializationError;
 
-  String? get authToken => _authToken;
   User? get currentUser => _currentUser;
   bool get isInitializing => _isInitializing;
   String? get initializationError => _initializationError;
 
   Future<void> initializeApp() async {
+    if (_isInitializing) return;
     _isInitializing = true;
+    _initializationError = null;
     notifyListeners();
 
     try {
-      // Add app initialization logic here:
-      // 1. Load cached token/user
-      // 2. Validate token
-      // 3. Fetch fresh user data if token exists
-      // 4. Set initial state
-
-      _isInitializing = false;
-      notifyListeners();
+      final firebaseUser = auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        final response = await AuthRepository().getCurrentUser('');
+        _currentUser = response.data;
+      }
     } catch (e) {
       _initializationError = e.toString();
+    } finally {
       _isInitializing = false;
       notifyListeners();
     }
   }
 
-  void setAuthToken(String token) {
-    _authToken = token;
-    notifyListeners();
-  }
-
-  void setCurrentUser(User user) {
+  void setCurrentUser(User? user) {
     _currentUser = user;
     notifyListeners();
   }
 
   void logout() {
-    _authToken = null;
     _currentUser = null;
     notifyListeners();
   }
@@ -70,8 +61,10 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _isAuthenticated;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
   Future<ApiResponse<User>> login(LoginRequest request) async {
@@ -81,8 +74,8 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _authRepository.login(request);
-      _isLoading = false;
       _isAuthenticated = true;
+      _isLoading = false;
       notifyListeners();
       return response;
     } on ApiError catch (e) {
@@ -112,15 +105,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<ApiResponse<User>> getCurrentUser(String token) async {
+  Future<ApiResponse<User>> getCurrentUser() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _authRepository.getCurrentUser(token);
-      _isLoading = false;
+      final response = await _authRepository.getCurrentUser('');
       _isAuthenticated = true;
+      _isLoading = false;
       notifyListeners();
       return response;
     } on ApiError catch (e) {
@@ -132,15 +125,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<ApiResponse<void>> logout(String token) async {
+  Future<ApiResponse<void>> logout() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _authRepository.logout(token);
-      _isLoading = false;
+      final response = await _authRepository.logout('');
       _isAuthenticated = false;
+      _isLoading = false;
       notifyListeners();
       return response;
     } on ApiError catch (e) {
@@ -158,10 +151,6 @@ class AchievementsProvider extends ChangeNotifier {
 
   AchievementsProvider(this._repository);
 
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
-
   bool _isLoading = false;
   String? _error;
   List<Achievement>? _achievements;
@@ -172,30 +161,26 @@ class AchievementsProvider extends ChangeNotifier {
   String? get error => _error;
   List<Achievement>? get achievements => _achievements;
   UserStats? get userStats => _userStats;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
   Future<void> loadAchievements(
-    String token, {
+    String userId, {
     bool forceRefresh = false,
   }) async {
-    if (!forceRefresh &&
-        _achievements != null &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5)) {
-      return;
-    }
+    if (!forceRefresh && _achievements != null && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getAchievements(token);
+      final response = await _repository.getAchievements(userId);
       _achievements = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -208,20 +193,15 @@ class AchievementsProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadUserStats(String token, {bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        _userStats != null &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5)) {
-      return;
-    }
+  Future<void> loadUserStats(String userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _userStats != null && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getUserStats(token);
+      final response = await _repository.getUserStats(userId);
       _userStats = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -233,6 +213,10 @@ class AchievementsProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  bool get _isCacheValid =>
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5);
 }
 
 // 4. Leaderboard Provider
@@ -240,10 +224,6 @@ class LeaderboardProvider extends ChangeNotifier {
   final LeaderboardRepository _repository;
 
   LeaderboardProvider(this._repository);
-
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
 
   bool _isLoading = false;
   String? _error;
@@ -257,25 +237,23 @@ class LeaderboardProvider extends ChangeNotifier {
   List<LeaderboardUser>? get leaderboard => _leaderboard;
   List<LeaderboardUser>? get topPerformers => _topPerformers;
   String get currentFilter => _currentFilter;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
-  Future<void> loadLeaderboard(
-    String token, {
+  Future<void> loadLeaderboard({
     String filter = 'overall',
     bool forceRefresh = false,
   }) async {
     if (!forceRefresh &&
         _leaderboard != null &&
         _currentFilter == filter &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5)) {
+        _isCacheValid)
       return;
-    }
 
     _isLoading = true;
     _error = null;
@@ -283,7 +261,7 @@ class LeaderboardProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _repository.getLeaderboard(token, filter: filter);
+      final response = await _repository.getLeaderboard(filter: filter);
       _leaderboard = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -296,23 +274,15 @@ class LeaderboardProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadTopPerformers(
-    String token, {
-    bool forceRefresh = false,
-  }) async {
-    if (!forceRefresh &&
-        _topPerformers != null &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5)) {
-      return;
-    }
+  Future<void> loadTopPerformers({bool forceRefresh = false}) async {
+    if (!forceRefresh && _topPerformers != null && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getTopPerformers(token);
+      final response = await _repository.getTopPerformers();
       _topPerformers = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -324,6 +294,10 @@ class LeaderboardProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  bool get _isCacheValid =>
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5);
 }
 
 // 5. Session Provider
@@ -331,10 +305,6 @@ class SessionProvider extends ChangeNotifier {
   final SessionRepository _repository;
 
   SessionProvider(this._repository);
-
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
 
   bool _isLoading = false;
   String? _error;
@@ -350,30 +320,26 @@ class SessionProvider extends ChangeNotifier {
   List<Session>? get pastSessions => _pastSessions;
   List<Session>? get pendingSessions => _pendingSessions;
   Session? get selectedSession => _selectedSession;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
   Future<void> loadUpcomingSessions(
-    String token, {
+    String userId, {
     bool forceRefresh = false,
   }) async {
-    if (!forceRefresh &&
-        _upcomingSessions != null &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5)) {
-      return;
-    }
+    if (!forceRefresh && _upcomingSessions != null && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getUpcomingSessions(token);
+      final response = await _repository.getUpcomingSessions(userId);
       _upcomingSessions = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -387,22 +353,17 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<void> loadPastSessions(
-    String token, {
+    String userId, {
     bool forceRefresh = false,
   }) async {
-    if (!forceRefresh &&
-        _pastSessions != null &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5)) {
-      return;
-    }
+    if (!forceRefresh && _pastSessions != null && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getPastSessions(token);
+      final response = await _repository.getPastSessions(userId);
       _pastSessions = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -416,22 +377,17 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<void> loadPendingSessions(
-    String token, {
+    String userId, {
     bool forceRefresh = false,
   }) async {
-    if (!forceRefresh &&
-        _pendingSessions != null &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5)) {
-      return;
-    }
+    if (!forceRefresh && _pendingSessions != null && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getPendingSessions(token);
+      final response = await _repository.getPendingSessions(userId);
       _pendingSessions = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -444,13 +400,13 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadSessionDetails(String token, String sessionId) async {
+  Future<void> loadSessionDetails(String userId, String sessionId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getSessionDetails(token, sessionId);
+      final response = await _repository.getSessionDetails(userId, sessionId);
       _selectedSession = response.data;
       _isLoading = false;
       notifyListeners();
@@ -462,13 +418,13 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> cancelSession(String token, String sessionId) async {
+  Future<void> cancelSession(String userId, String sessionId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _repository.cancelSession(token, sessionId);
+      await _repository.cancelSession(userId, sessionId);
       _upcomingSessions?.removeWhere((session) => session.id == sessionId);
       _isLoading = false;
       notifyListeners();
@@ -479,6 +435,58 @@ class SessionProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  Future<void> rescheduleSession(
+    String userId,
+    String sessionId,
+    DateTime newStartTime,
+  ) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // First update the session in Firestore via the repository
+      await _repository.rescheduleSession(userId, sessionId, newStartTime);
+
+      // Then update the local state
+      if (_upcomingSessions != null) {
+        _upcomingSessions =
+            _upcomingSessions?.map((session) {
+              if (session.id == sessionId) {
+                return session.copyWith(startTime: newStartTime);
+              }
+              return session;
+            }).toList();
+      }
+
+      if (_pendingSessions != null) {
+        _pendingSessions =
+            _pendingSessions?.map((session) {
+              if (session.id == sessionId) {
+                return session.copyWith(startTime: newStartTime);
+              }
+              return session;
+            }).toList();
+      }
+
+      if (_selectedSession?.id == sessionId) {
+        _selectedSession = _selectedSession?.copyWith(startTime: newStartTime);
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  bool get _isCacheValid =>
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5);
 }
 
 // 6. Home Provider
@@ -486,10 +494,6 @@ class HomeProvider extends ChangeNotifier {
   final HomeRepository _repository;
 
   HomeProvider(this._repository);
-
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
 
   bool _isLoading = false;
   String? _error;
@@ -503,44 +507,46 @@ class HomeProvider extends ChangeNotifier {
   UserStats? get userStats => _userStats;
   List<Activity>? get recentActivities => _recentActivities;
   List<Session>? get upcomingSessionsPreview => _upcomingSessionsPreview;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
-  Future<void> loadHomeData(String token, {bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5)) {
-      return;
-    }
+  Future<void> loadHomeData(String userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final statsResponse = await _repository.getUserStats(token);
-      final activitiesResponse = await _repository.getRecentActivities(token);
+      final statsResponse = await _repository.getUserStats(userId);
+      final activitiesResponse = await _repository.getRecentActivities(
+        userId: userId,
+      );
       final sessionsResponse = await _repository.getUpcomingSessionsPreview(
-        token,
+        userId,
       );
 
       _userStats = statsResponse.data;
       _recentActivities = activitiesResponse.data;
       _upcomingSessionsPreview = sessionsResponse.data;
       _lastFetched = DateTime.now();
-      _error = null;
+      _isLoading = false;
     } on ApiError catch (e) {
       _error = e.message;
       debugPrint('Error loading home data: ${e.message}');
     } finally {
-      _isLoading = false;
       notifyListeners();
     }
   }
+
+  bool get _isCacheValid =>
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5);
 }
 
 // 7. Tutor Provider
@@ -548,10 +554,6 @@ class TutorProvider extends ChangeNotifier {
   final TutorRepository _repository;
 
   TutorProvider(this._repository);
-
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
 
   bool _isLoading = false;
   String? _error;
@@ -575,11 +577,12 @@ class TutorProvider extends ChangeNotifier {
   double? get currentMinRating => _currentMinRating;
   int get currentPage => _currentPage;
   bool get hasMore => _hasMore;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
   Future<void> loadTutors({
@@ -659,13 +662,13 @@ class TutorProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadTutorApplications(String token) async {
+  Future<void> loadTutorApplications(String userId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getTutorApplications(token);
+      final response = await _repository.getTutorApplications(userId);
       _tutorApplications = response.data;
       _isLoading = false;
       notifyListeners();
@@ -684,10 +687,6 @@ class ChatProvider extends ChangeNotifier {
 
   ChatProvider(this._repository);
 
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
-
   bool _isLoading = false;
   String? _error;
   List<Chat>? _chats;
@@ -700,27 +699,23 @@ class ChatProvider extends ChangeNotifier {
   List<Chat>? get chats => _chats;
   List<Message>? get messages => _messages;
   String? get selectedChatId => _selectedChatId;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
-  Future<void> loadChats({bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        _chats != null &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) < const Duration(minutes: 1)) {
-      return;
-    }
+  Future<void> loadChats(String userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _chats != null && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getChats();
+      final response = await _repository.getChats(userId);
       _chats = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -772,6 +767,10 @@ class ChatProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  bool get _isCacheValid =>
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 1);
 }
 
 // 9. Analytics Provider
@@ -779,10 +778,6 @@ class AnalyticsProvider extends ChangeNotifier {
   final AnalyticsRepository _repository;
 
   AnalyticsProvider(this._repository);
-
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
 
   bool _isLoading = false;
   String? _error;
@@ -798,28 +793,27 @@ class AnalyticsProvider extends ChangeNotifier {
   List<SubjectDistribution>? get subjectDistribution => _subjectDistribution;
   List<TutorPerformance>? get tutorPerformance => _tutorPerformance;
   DateTimeRange? get dateRange => _dateRange;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
   void setDateRange(DateTimeRange range) {
-    _dateRange = range;
-    notifyListeners();
+    if (_dateRange != range) {
+      _dateRange = range;
+      notifyListeners();
+    }
   }
 
-  Future<void> loadAnalyticsData({
+  Future<void> loadAnalyticsData(
+    String userId, {
     DateTimeRange? dateRange,
     bool forceRefresh = false,
   }) async {
-    if (!forceRefresh &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) <
-            const Duration(minutes: 30)) {
-      return;
-    }
+    if (!forceRefresh && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
@@ -827,15 +821,14 @@ class AnalyticsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final weeklyResponse = await _repository.getWeeklyActivity();
-      final subjectResponse = await _repository.getSubjectDistribution();
+      final weeklyResponse = await _repository.getWeeklyActivity(userId);
+      final subjectResponse = await _repository.getSubjectDistribution(userId);
       final tutorResponse = await _repository.getTutorPerformance();
 
       _weeklyActivity = weeklyResponse.data;
       _subjectDistribution = subjectResponse.data;
       _tutorPerformance = tutorResponse.data;
       _lastFetched = DateTime.now();
-
       _isLoading = false;
       notifyListeners();
     } on ApiError catch (e) {
@@ -845,6 +838,10 @@ class AnalyticsProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  bool get _isCacheValid =>
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 30);
 }
 
 // 10. Study Materials Provider
@@ -852,10 +849,6 @@ class StudyMaterialsProvider extends ChangeNotifier {
   final StudyMaterialsRepository _repository;
 
   StudyMaterialsProvider(this._repository);
-
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
 
   bool _isLoading = false;
   String? _error;
@@ -865,28 +858,26 @@ class StudyMaterialsProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   List<StudyMaterial>? get studyMaterials => _studyMaterials;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
-  Future<void> loadStudyMaterials({bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        _studyMaterials != null &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) <
-            const Duration(minutes: 30)) {
-      return;
-    }
+  Future<void> loadStudyMaterials(
+    String userId, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _studyMaterials != null && _isCacheValid) return;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _repository.getStudyMaterials();
+      final response = await _repository.getStudyMaterials(userId);
       _studyMaterials = response.data;
       _lastFetched = DateTime.now();
       _isLoading = false;
@@ -898,6 +889,10 @@ class StudyMaterialsProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  bool get _isCacheValid =>
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 30);
 }
 
 // 11. Practice Tests Provider
@@ -905,10 +900,6 @@ class PracticeTestsProvider extends ChangeNotifier {
   final PracticeTestsRepository _repository;
 
   PracticeTestsProvider(this._repository);
-
-  String? _authToken;
-  set authToken(String? token) => _authToken = token;
-  String? get authToken => _authToken;
 
   bool _isLoading = false;
   String? _error;
@@ -930,14 +921,16 @@ class PracticeTestsProvider extends ChangeNotifier {
   String? get currentSubjectFilter => _currentSubjectFilter;
   String? get currentDifficultyFilter => _currentDifficultyFilter;
   String? get currentSortBy => _currentSortBy;
-  DateTime? get lastFetched => _lastFetched;
 
   void clearError() {
-    _error = null;
-    notifyListeners();
+    if (_error != null) {
+      _error = null;
+      notifyListeners();
+    }
   }
 
   Future<void> loadPracticeTests({
+    String? userId,
     String? subject,
     String? difficulty,
     String? sortBy,
@@ -948,11 +941,8 @@ class PracticeTestsProvider extends ChangeNotifier {
         _currentSubjectFilter == subject &&
         _currentDifficultyFilter == difficulty &&
         _currentSortBy == sortBy &&
-        _lastFetched != null &&
-        DateTime.now().difference(_lastFetched!) <
-            const Duration(minutes: 30)) {
+        _isCacheValid)
       return;
-    }
 
     _isLoading = true;
     _error = null;
@@ -963,6 +953,7 @@ class PracticeTestsProvider extends ChangeNotifier {
 
     try {
       final response = await _repository.getPracticeTests(
+        userId: userId,
         subject: subject,
         difficulty: difficulty,
         sortBy: sortBy,
@@ -1001,14 +992,14 @@ class PracticeTestsProvider extends ChangeNotifier {
   Future<void> submitTestAnswers(
     String testId,
     Map<int, String> answers,
+    String userId,
   ) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _repository.submitTestAnswers(testId, answers);
-      // In a real app, you'd parse the results from the response
+      await _repository.submitTestAnswers(testId, answers, userId);
       _testResults = {'score': 85, 'correct': 17, 'total': 20};
       _isLoading = false;
       notifyListeners();
@@ -1019,100 +1010,67 @@ class PracticeTestsProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  bool get _isCacheValid =>
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 30);
 }
 
 // 12. MultiProvider Setup
-List<SingleChildWidget> getProviders(String authToken) {
-  final httpClient = http.Client();
-
+List<SingleChildWidget> getProviders() {
   return [
     ChangeNotifierProvider<AppProvider>(create: (_) => AppProvider()),
-    Provider<AuthRepository>(create: (_) => AuthRepository(httpClient)),
+    Provider<AuthRepository>(create: (_) => AuthRepository()),
     ChangeNotifierProxyProvider<AppProvider, AuthProvider>(
-      create: (_) => AuthProvider(AuthRepository(httpClient)),
+      create: (_) => AuthProvider(AuthRepository()),
       update: (_, appProvider, authProvider) => authProvider!,
     ),
-    Provider<AchievementsRepository>(
-      create: (_) => AchievementsRepository(httpClient),
-    ),
+    Provider<AchievementsRepository>(create: (_) => AchievementsRepository()),
     ChangeNotifierProxyProvider<AppProvider, AchievementsProvider>(
-      create: (_) => AchievementsProvider(AchievementsRepository(httpClient)),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => AchievementsProvider(AchievementsRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
-    Provider<LeaderboardRepository>(
-      create: (_) => LeaderboardRepository(httpClient),
-    ),
+    Provider<LeaderboardRepository>(create: (_) => LeaderboardRepository()),
     ChangeNotifierProxyProvider<AppProvider, LeaderboardProvider>(
-      create: (_) => LeaderboardProvider(LeaderboardRepository(httpClient)),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => LeaderboardProvider(LeaderboardRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
-    Provider<SessionRepository>(create: (_) => SessionRepository(httpClient)),
+    Provider<SessionRepository>(create: (_) => SessionRepository()),
     ChangeNotifierProxyProvider<AppProvider, SessionProvider>(
-      create: (_) => SessionProvider(SessionRepository(httpClient)),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => SessionProvider(SessionRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
-    Provider<HomeRepository>(create: (_) => HomeRepository(httpClient)),
+    Provider<HomeRepository>(create: (_) => HomeRepository()),
     ChangeNotifierProxyProvider<AppProvider, HomeProvider>(
-      create: (_) => HomeProvider(HomeRepository(httpClient)),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => HomeProvider(HomeRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
-    Provider<TutorRepository>(create: (_) => TutorRepository(httpClient)),
+    Provider<TutorRepository>(create: (_) => TutorRepository()),
     ChangeNotifierProxyProvider<AppProvider, TutorProvider>(
-      create: (_) => TutorProvider(TutorRepository(httpClient)),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => TutorProvider(TutorRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
-    Provider<ChatRepository>(
-      create: (_) => ChatRepository(httpClient, authToken),
-    ),
+    Provider<ChatRepository>(create: (_) => ChatRepository()),
     ChangeNotifierProxyProvider<AppProvider, ChatProvider>(
-      create: (_) => ChatProvider(ChatRepository(httpClient, authToken)),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => ChatProvider(ChatRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
-    Provider<AnalyticsRepository>(
-      create: (_) => AnalyticsRepository(httpClient, authToken),
-    ),
+    Provider<AnalyticsRepository>(create: (_) => AnalyticsRepository()),
     ChangeNotifierProxyProvider<AppProvider, AnalyticsProvider>(
-      create:
-          (_) => AnalyticsProvider(AnalyticsRepository(httpClient, authToken)),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => AnalyticsProvider(AnalyticsRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
     Provider<StudyMaterialsRepository>(
-      create: (_) => StudyMaterialsRepository(httpClient, authToken),
+      create: (_) => StudyMaterialsRepository(),
     ),
     ChangeNotifierProxyProvider<AppProvider, StudyMaterialsProvider>(
-      create:
-          (_) => StudyMaterialsProvider(
-            StudyMaterialsRepository(httpClient, authToken),
-          ),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => StudyMaterialsProvider(StudyMaterialsRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
-    Provider<PracticeTestsRepository>(
-      create: (_) => PracticeTestsRepository(httpClient, authToken),
-    ),
+    Provider<PracticeTestsRepository>(create: (_) => PracticeTestsRepository()),
     ChangeNotifierProxyProvider<AppProvider, PracticeTestsProvider>(
-      create:
-          (_) => PracticeTestsProvider(
-            PracticeTestsRepository(httpClient, authToken),
-          ),
-      update:
-          (_, appProvider, provider) =>
-              provider!..authToken = appProvider.authToken,
+      create: (_) => PracticeTestsProvider(PracticeTestsRepository()),
+      update: (_, appProvider, provider) => provider!,
     ),
   ];
 }

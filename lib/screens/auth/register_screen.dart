@@ -1,8 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:studybuddy/screens/pages/index.dart';
-import '../../utils/modelsAndRepsositories/models_and_repositories.dart';
-import '../../utils/providers/providers.dart';
+import 'package:studybuddy/utils/modelsAndRepsositories/models_and_repositories.dart';
+import 'package:studybuddy/utils/providers/providers.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'log_in.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -18,7 +21,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-  bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -40,40 +42,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     String fullName = nameController.text.trim();
     List<String> nameParts = fullName.split(' ');
 
-    // Initialize variables for firstName and lastName
     String firstName = nameParts.isNotEmpty ? nameParts[0] : '';
     String lastName =
         nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
 
-    setState(() => _isLoading = true);
-
     try {
       final response = await authProvider.register(
         RegisterRequest(
-          email: emailController.text,
+          email: emailController.text.trim(),
           password: passwordController.text,
-          confirmPassword: confirmPasswordController.text,
           firstName: firstName,
           lastName: lastName,
-          phone: '', // You can add a phone field if needed
         ),
       );
 
       if (response.success && response.data != null) {
-        // Save the auth token and user data
-        appProvider.setAuthToken(response.data!.authToken ?? '');
         appProvider.setCurrentUser(response.data!);
-
-        // Navigating to home screen after successful registration
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => Index()),
+          MaterialPageRoute(builder: (context) => IndexPage()),
         );
       }
     } on ApiError catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message),
+          content: Text(_errorMessage(e)),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Theme.of(context).colorScheme.error,
           shape: RoundedRectangleBorder(
@@ -81,8 +74,94 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       );
-    } finally {
-      setState(() => _isLoading = false);
+    }
+  }
+
+  // Future<void> _handleGoogleSignIn(BuildContext context) async {
+  //   final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  //   final appProvider = Provider.of<AppProvider>(context, listen: false);
+
+  //   try {
+  //     final GoogleSignIn googleSignIn = GoogleSignIn();
+  //     final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+  //     if (googleUser == null) return; // User cancelled sign-in
+
+  //     final GoogleSignInAuthentication googleAuth =
+  //         await googleUser.authentication;
+  //     final credential = auth.GoogleAuthProvider.credential(
+  //       accessToken: googleAuth.accessToken,
+  //       idToken: googleAuth.idToken,
+  //     );
+
+  //     final authResult = await FirebaseConfig.firebaseAuth.signInWithCredential(
+  //       credential,
+  //     );
+  //     final userDoc =
+  //         await FirebaseConfig.firestore
+  //             .collection('users')
+  //             .doc(authResult.user!.uid)
+  //             .get();
+
+  //     final userData =
+  //         userDoc.exists
+  //             ? User.fromJson({
+  //               ...userDoc.data()!,
+  //               'id': authResult.user!.uid,
+  //               'email': authResult.user!.email,
+  //               'is_verified': authResult.user!.emailVerified,
+  //             })
+  //             : await _createUserFromGoogle(authResult.user!);
+
+  //     appProvider.setCurrentUser(userData);
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(builder: (context) => PagesIndex()),
+  //     );
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text('Google Sign-In failed: ${e.toString()}'),
+  //         behavior: SnackBarBehavior.floating,
+  //         backgroundColor: Theme.of(context).colorScheme.error,
+  //         shape: RoundedRectangleBorder(
+  //           borderRadius: BorderRadius.circular(12),
+  //         ),
+  //       ),
+  //     );
+  //   }
+  // }
+
+  Future<User> _createUserFromGoogle(auth.User firebaseUser) async {
+    final userData = {
+      'email': firebaseUser.email,
+      'first_name': firebaseUser.displayName?.split(' ').first,
+      'last_name': firebaseUser.displayName?.split(' ').skip(1).join(' '),
+      'phone': firebaseUser.phoneNumber,
+      'is_active': true,
+      'is_verified': firebaseUser.emailVerified,
+      'date_joined': Timestamp.now(),
+      'user_type': 'student',
+    };
+
+    await FirebaseConfig.firestore
+        .collection('users')
+        .doc(firebaseUser.uid)
+        .set(userData);
+
+    return User.fromJson({...userData, 'id': firebaseUser.uid});
+  }
+
+  String _errorMessage(ApiError error) {
+    switch (error.code?.toLowerCase()) {
+      case 'email-already-in-use':
+        return 'This email is already registered';
+      case 'invalid-email':
+        return 'Invalid email format';
+      case 'weak-password':
+        return 'Password is too weak';
+      default:
+        return error.message;
     }
   }
 
@@ -113,7 +192,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     SizedBox(height: size.height * 0.05),
                     _buildWelcomeSection(theme),
                     SizedBox(height: size.height * 0.05),
-                    _buildRegisterForm(theme),
+                    _buildRegisterForm(theme, context),
                     const Spacer(),
                     _buildLoginLink(theme),
                   ],
@@ -137,11 +216,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Image.asset("assets/logo.png", height: 100, fit: BoxFit.cover),
-          // Icon(
-          //   Icons.school_rounded,
-          //   size: 48,
-          //   color: theme.colorScheme.primary,
-          // ),
         ),
         const SizedBox(height: 24),
         Text(
@@ -162,7 +236,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildRegisterForm(ThemeData theme) {
+  Widget _buildRegisterForm(ThemeData theme, BuildContext context) {
     return Form(
       key: _formKey,
       child: Column(
@@ -179,7 +253,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 24),
           _buildDivider(theme),
           const SizedBox(height: 24),
-          _buildGoogleSignInButton(theme),
+          _buildGoogleSignInButton(theme, context),
         ],
       ),
     );
@@ -479,7 +553,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildGoogleSignInButton(ThemeData theme) {
+  Widget _buildGoogleSignInButton(ThemeData theme, BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
@@ -498,6 +572,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3)),
         ),
         onPressed: () {},
+        // onPressed: () => _handleGoogleSignIn(context),
       ),
     );
   }
@@ -527,33 +602,5 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _register() async {
-    setState(() => _isLoading = true);
-    try {
-      await Future.delayed(const Duration(seconds: 3));
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => Index()),
-      );
-      // TODO: Implement actual registration logic
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Registration failed: ${e.toString()}'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
   }
 }

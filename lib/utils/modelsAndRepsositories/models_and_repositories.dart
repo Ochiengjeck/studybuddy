@@ -1,24 +1,16 @@
-// models_and_repositories.dart
-
 // 1. Import Statements
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 // =============================================
 // 2. Configurations
 // =============================================
 
-class ApiConfig {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
-  static const Map<String, String> headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-
-  static Map<String, String> authHeaders(String token) {
-    return {...headers, 'Authorization': 'Bearer $token'};
-  }
+class FirebaseConfig {
+  static FirebaseFirestore get firestore => FirebaseFirestore.instance;
+  static auth.FirebaseAuth get firebaseAuth => auth.FirebaseAuth.instance;
 }
 
 // =============================================
@@ -29,13 +21,13 @@ class ApiResponse<T> {
   final bool success;
   final String message;
   final T? data;
-  final int? statusCode;
+  final String? errorCode;
 
   ApiResponse({
     required this.success,
     required this.message,
     this.data,
-    this.statusCode,
+    this.errorCode,
   });
 
   factory ApiResponse.fromJson(
@@ -46,32 +38,24 @@ class ApiResponse<T> {
       success: json['success'] ?? false,
       message: json['message'] ?? '',
       data: json['data'] != null ? fromJsonT(json['data']) : null,
-      statusCode: json['status_code'],
+      errorCode: json['error_code'],
     );
   }
 }
 
 class ApiError {
   final String message;
-  final int? statusCode;
+  final String? code;
   final dynamic errors;
 
-  ApiError({required this.message, this.statusCode, this.errors});
+  ApiError({required this.message, this.code, this.errors});
 
-  factory ApiError.fromResponse(http.Response response) {
-    try {
-      final json = jsonDecode(response.body);
-      return ApiError(
-        message: json['message'] ?? 'An error occurred',
-        statusCode: response.statusCode,
-        errors: json['errors'],
-      );
-    } catch (e) {
-      return ApiError(
-        message: 'Failed to parse error response: ${e.toString()}',
-        statusCode: response.statusCode,
-      );
-    }
+  factory ApiError.fromFirebaseException(dynamic e) {
+    return ApiError(
+      message: e.message ?? 'An error occurred',
+      code: e.code,
+      errors: null,
+    );
   }
 }
 
@@ -87,7 +71,6 @@ class User {
   final DateTime? dateJoined;
   final DateTime? lastLogin;
   final String? userType;
-  final String? authToken;
 
   User({
     required this.id,
@@ -101,7 +84,6 @@ class User {
     this.dateJoined,
     this.lastLogin,
     this.userType,
-    this.authToken,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -115,12 +97,17 @@ class User {
     isVerified: json['is_verified'] ?? false,
     dateJoined:
         json['date_joined'] != null
-            ? DateTime.parse(json['date_joined'])
+            ? (json['date_joined'] is Timestamp
+                ? json['date_joined'].toDate()
+                : DateTime.parse(json['date_joined']))
             : null,
     lastLogin:
-        json['last_login'] != null ? DateTime.parse(json['last_login']) : null,
+        json['last_login'] != null
+            ? (json['last_login'] is Timestamp
+                ? json['last_login'].toDate()
+                : DateTime.parse(json['last_login']))
+            : null,
     userType: json['user_type'],
-    authToken: json['auth_token'],
   );
 
   Map<String, dynamic> toJson() => {
@@ -152,25 +139,15 @@ class User {
 class LoginRequest {
   final String email;
   final String password;
-  final bool rememberMe;
 
-  LoginRequest({
-    required this.email,
-    required this.password,
-    this.rememberMe = false,
-  });
+  LoginRequest({required this.email, required this.password});
 
-  Map<String, dynamic> toJson() => {
-    'email': email,
-    'password': password,
-    'remember_me': rememberMe,
-  };
+  Map<String, dynamic> toJson() => {'email': email, 'password': password};
 }
 
 class RegisterRequest {
   final String email;
   final String password;
-  final String confirmPassword;
   final String? firstName;
   final String? lastName;
   final String? phone;
@@ -178,7 +155,6 @@ class RegisterRequest {
   RegisterRequest({
     required this.email,
     required this.password,
-    required this.confirmPassword,
     this.firstName,
     this.lastName,
     this.phone,
@@ -187,7 +163,6 @@ class RegisterRequest {
   Map<String, dynamic> toJson() => {
     'email': email,
     'password': password,
-    'password2': confirmPassword,
     'first_name': firstName,
     'last_name': lastName,
     'phone': phone,
@@ -196,23 +171,10 @@ class RegisterRequest {
 
 class PasswordResetRequest {
   final String email;
-  final String? otp;
-  final String? newPassword;
-  final String? confirmPassword;
 
-  PasswordResetRequest({
-    required this.email,
-    this.otp,
-    this.newPassword,
-    this.confirmPassword,
-  });
+  PasswordResetRequest({required this.email});
 
-  Map<String, dynamic> toJson() => {
-    'email': email,
-    if (otp != null) 'otp': otp,
-    if (newPassword != null) 'new_password': newPassword,
-    if (confirmPassword != null) 'confirm_password': confirmPassword,
-  };
+  Map<String, dynamic> toJson() => {'email': email};
 }
 
 class OtpVerification {
@@ -258,7 +220,9 @@ class Achievement {
     progress: (json['progress'] ?? 0.0).toDouble(),
     earnedDate:
         json['earned_date'] != null
-            ? DateTime.parse(json['earned_date'])
+            ? (json['earned_date'] is Timestamp
+                ? json['earned_date'].toDate()
+                : DateTime.parse(json['earned_date']))
             : null,
     points: json['points'] ?? 0,
   );
@@ -270,7 +234,7 @@ class Achievement {
     'icon': icon,
     'earned': earned,
     'progress': progress,
-    'earned_date': earnedDate?.toIso8601String(),
+    'earned_date': earnedDate,
     'points': points,
   };
 }
@@ -372,6 +336,36 @@ class Session {
   final List<String> participantImages;
   final bool isCurrentUser;
 
+  Session copyWith({
+    String? id,
+    String? title,
+    String? tutorName,
+    String? tutorImage,
+    String? platform,
+    DateTime? startTime,
+    Duration? duration,
+    String? description,
+    SessionStatus? status,
+    double? rating,
+    List<String>? participantImages,
+    bool? isCurrentUser,
+  }) {
+    return Session(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      tutorName: tutorName ?? this.tutorName,
+      tutorImage: tutorImage ?? this.tutorImage,
+      platform: platform ?? this.platform,
+      startTime: startTime ?? this.startTime,
+      duration: duration ?? this.duration,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      rating: rating ?? this.rating,
+      participantImages: participantImages ?? this.participantImages,
+      isCurrentUser: isCurrentUser ?? this.isCurrentUser,
+    );
+  }
+
   Session({
     required this.id,
     required this.title,
@@ -393,7 +387,10 @@ class Session {
     tutorName: json['tutor_name'] ?? '',
     tutorImage: json['tutor_image'] ?? '',
     platform: json['platform'] ?? 'Google Meet',
-    startTime: DateTime.parse(json['start_time']),
+    startTime:
+        json['start_time'] is Timestamp
+            ? json['start_time'].toDate()
+            : DateTime.parse(json['start_time']),
     duration: Duration(minutes: json['duration_minutes'] ?? 60),
     description: json['description'] ?? '',
     status: _parseSessionStatus(json['status']),
@@ -408,7 +405,7 @@ class Session {
     'tutor_name': tutorName,
     'tutor_image': tutorImage,
     'platform': platform,
-    'start_time': startTime.toIso8601String(),
+    'start_time': startTime,
     'duration_minutes': duration.inMinutes,
     'description': description,
     'status': status.toString().split('.').last,
@@ -547,7 +544,10 @@ class Activity {
     type: _parseActivityType(json['type']),
     title: json['title'] ?? '',
     description: json['description'] ?? '',
-    time: DateTime.parse(json['time']),
+    time:
+        json['time'] is Timestamp
+            ? json['time'].toDate()
+            : DateTime.parse(json['time']),
     relatedSessionId: json['related_session_id'],
     relatedTutorName: json['related_tutor_name'],
     relatedTutorImage: json['related_tutor_image'],
@@ -558,7 +558,7 @@ class Activity {
     'type': type.toString().split('.').last,
     'title': title,
     'description': description,
-    'time': time.toIso8601String(),
+    'time': time,
     'related_session_id': relatedSessionId,
     'related_tutor_name': relatedTutorName,
     'related_tutor_image': relatedTutorImage,
@@ -585,7 +585,7 @@ class Activity {
           ? '$daysDiff ${daysDiff == 1 ? 'day' : 'days'} ago'
           : '${Session._monthNames[time.month - 1]} ${time.day}';
     }
-    return 'Today';
+    return ' TODAY';
   }
 
   IconData get icon {
@@ -708,18 +708,23 @@ class Tutor {
     preferredTeachingMode: json['preferred_teaching_mode'],
     preferredVenue: json['preferred_venue'],
     createdAt:
-        json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
+        json['created_at'] != null
+            ? (json['created_at'] is Timestamp
+                ? json['created_at'].toDate()
+                : DateTime.parse(json['created_at']))
+            : null,
     updatedAt:
-        json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+        json['updated_at'] != null
+            ? (json['updated_at'] is Timestamp
+                ? json['updated_at'].toDate()
+                : DateTime.parse(json['updated_at']))
+            : null,
   );
 
   static Map<String, List<String>> _parseAvailability(dynamic availability) {
     if (availability == null) return {};
     try {
-      final availabilityMap =
-          availability is String
-              ? jsonDecode(availability)
-              : Map<String, dynamic>.from(availability);
+      final availabilityMap = Map<String, dynamic>.from(availability);
       return availabilityMap.map(
         (key, value) => MapEntry(key, List<String>.from(value ?? [])),
       );
@@ -743,11 +748,11 @@ class Tutor {
     'is_available': isAvailable,
     'profile_picture': profilePicture,
     'subjects': subjects,
-    'availability': jsonEncode(availability),
+    'availability': availability,
     'preferred_teaching_mode': preferredTeachingMode,
     'preferred_venue': preferredVenue,
-    'created_at': createdAt?.toIso8601String(),
-    'updated_at': updatedAt?.toIso8601String(),
+    'created_at': createdAt,
+    'updated_at': updatedAt,
   };
 }
 
@@ -790,11 +795,15 @@ class TutorApplication {
         venue: json['venue'],
         submittedAt:
             json['submitted_at'] != null
-                ? DateTime.parse(json['submitted_at'])
+                ? (json['submitted_at'] is Timestamp
+                    ? json['submitted_at'].toDate()
+                    : DateTime.parse(json['submitted_at']))
                 : null,
         reviewedAt:
             json['reviewed_at'] != null
-                ? DateTime.parse(json['reviewed_at'])
+                ? (json['reviewed_at'] is Timestamp
+                    ? json['reviewed_at'].toDate()
+                    : DateTime.parse(json['reviewed_at']))
                 : null,
         reviewNotes: json['review_notes'],
       );
@@ -802,10 +811,7 @@ class TutorApplication {
   static Map<String, List<String>> _parseAvailability(dynamic availability) {
     if (availability == null) return {};
     try {
-      final availabilityMap =
-          availability is String
-              ? jsonDecode(availability)
-              : Map<String, dynamic>.from(availability);
+      final availabilityMap = Map<String, dynamic>.from(availability);
       return availabilityMap.map(
         (key, value) => MapEntry(key, List<String>.from(value ?? [])),
       );
@@ -820,11 +826,11 @@ class TutorApplication {
     'status': status,
     'personal_info': personalInfo,
     'subjects': subjects,
-    'availability': jsonEncode(availability),
+    'availability': availability,
     'teaching_mode': teachingMode,
     'venue': venue,
-    'submitted_at': submittedAt?.toIso8601String(),
-    'reviewed_at': reviewedAt?.toIso8601String(),
+    'submitted_at': submittedAt,
+    'reviewed_at': reviewedAt,
     'review_notes': reviewNotes,
   };
 }
@@ -853,13 +859,25 @@ class Chat {
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) => Chat(
-    id: json['id'],
-    name: json['name'],
+    id: json['id']?.toString() ?? '',
+    name: json['name'] ?? '',
     imageUrl: json['image_url'],
-    lastMessage: json['last_message'],
-    lastMessageTime: DateTime.parse(json['last_message_time']),
-    unreadCount: json['unread_count'],
+    lastMessage: json['last_message'] ?? '',
+    lastMessageTime:
+        json['last_message_time'] is Timestamp
+            ? json['last_message_time'].toDate()
+            : DateTime.parse(json['last_message_time']),
+    unreadCount: json['unread_count'] ?? 0,
   );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'image_url': imageUrl,
+    'last_message': lastMessage,
+    'last_message_time': lastMessageTime,
+    'unread_count': unreadCount,
+  };
 }
 
 class Message {
@@ -880,11 +898,14 @@ class Message {
   });
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
-    id: json['id'],
-    chatId: json['chat_id'],
-    text: json['text'],
-    isMe: json['is_me'],
-    time: DateTime.parse(json['time']),
+    id: json['id']?.toString() ?? '',
+    chatId: json['chat_id']?.toString() ?? '',
+    text: json['text'] ?? '',
+    isMe: json['is_me'] ?? false,
+    time:
+        json['time'] is Timestamp
+            ? json['time'].toDate()
+            : DateTime.parse(json['time']),
     status: MessageStatus.values.firstWhere(
       (e) => e.toString() == 'MessageStatus.${json['status']}',
       orElse: () => MessageStatus.sent,
@@ -892,9 +913,11 @@ class Message {
   );
 
   Map<String, dynamic> toJson() => {
+    'id': id,
     'chat_id': chatId,
     'text': text,
     'is_me': isMe,
+    'time': time,
     'status': status.toString().split('.').last,
   };
 }
@@ -915,10 +938,16 @@ class WeeklyActivity {
   });
 
   factory WeeklyActivity.fromJson(Map<String, dynamic> json) => WeeklyActivity(
-    day: json['day'],
-    sessions: json['sessions'],
-    duration: json['duration'],
+    day: json['day'] ?? '',
+    sessions: json['sessions'] ?? 0,
+    duration: json['duration'] ?? 0,
   );
+
+  Map<String, dynamic> toJson() => {
+    'day': day,
+    'sessions': sessions,
+    'duration': duration,
+  };
 }
 
 class SubjectDistribution {
@@ -934,10 +963,16 @@ class SubjectDistribution {
 
   factory SubjectDistribution.fromJson(Map<String, dynamic> json) =>
       SubjectDistribution(
-        subject: json['subject'],
-        count: json['count'],
-        color: Color(json['color']),
+        subject: json['subject'] ?? '',
+        count: json['count'] ?? 0,
+        color: Color(json['color'] ?? 0xFF000000),
       );
+
+  Map<String, dynamic> toJson() => {
+    'subject': subject,
+    'count': count,
+    'color': color.value,
+  };
 }
 
 class TutorPerformance {
@@ -957,12 +992,20 @@ class TutorPerformance {
 
   factory TutorPerformance.fromJson(Map<String, dynamic> json) =>
       TutorPerformance(
-        tutorId: json['tutor_id'],
-        name: json['name'],
-        sessions: json['sessions'],
-        rating: json['rating'].toDouble(),
-        points: json['points'],
+        tutorId: json['tutor_id']?.toString() ?? '',
+        name: json['name'] ?? '',
+        sessions: json['sessions'] ?? 0,
+        rating: json['rating']?.toDouble() ?? 0.0,
+        points: json['points'] ?? 0,
       );
+
+  Map<String, dynamic> toJson() => {
+    'tutor_id': tutorId,
+    'name': name,
+    'sessions': sessions,
+    'rating': rating,
+    'points': points,
+  };
 }
 
 // =============================================
@@ -987,15 +1030,27 @@ class SavedItem {
   });
 
   factory SavedItem.fromJson(Map<String, dynamic> json) => SavedItem(
-    id: json['id'],
-    title: json['title'],
-    subtitle: json['subtitle'],
-    type: json['type'],
-    savedDate: DateTime.parse(json['saved_date']),
+    id: json['id']?.toString() ?? '',
+    title: json['title'] ?? '',
+    subtitle: json['subtitle'] ?? '',
+    type: json['type'] ?? '',
+    savedDate:
+        json['saved_date'] is Timestamp
+            ? json['saved_date'].toDate()
+            : DateTime.parse(json['saved_date']),
     icon: _getIconFromString(json['icon']),
   );
 
-  static IconData _getIconFromString(String iconName) {
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'subtitle': subtitle,
+    'type': type,
+    'saved_date': savedDate,
+    'icon': _getIconString(icon),
+  };
+
+  static IconData _getIconFromString(String? iconName) {
     switch (iconName) {
       case 'video_library':
         return Icons.video_library;
@@ -1006,6 +1061,13 @@ class SavedItem {
       default:
         return Icons.bookmark;
     }
+  }
+
+  static String _getIconString(IconData icon) {
+    if (icon == Icons.video_library) return 'video_library';
+    if (icon == Icons.article) return 'article';
+    if (icon == Icons.quiz) return 'quiz';
+    return 'bookmark';
   }
 }
 
@@ -1027,15 +1089,24 @@ class StudyMaterial {
   });
 
   factory StudyMaterial.fromJson(Map<String, dynamic> json) => StudyMaterial(
-    id: json['id'],
-    subject: json['subject'],
-    resourceCount: json['resource_count'],
-    progress: json['progress'].toDouble(),
-    color: Color(json['color']),
+    id: json['id']?.toString() ?? '',
+    subject: json['subject'] ?? '',
+    resourceCount: json['resource_count'] ?? 0,
+    progress: json['progress']?.toDouble() ?? 0.0,
+    color: Color(json['color'] ?? 0xFF000000),
     icon: _getIconFromString(json['icon']),
   );
 
-  static IconData _getIconFromString(String iconName) {
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'subject': subject,
+    'resource_count': resourceCount,
+    'progress': progress,
+    'color': color.value,
+    'icon': _getIconString(icon),
+  };
+
+  static IconData _getIconFromString(String? iconName) {
     switch (iconName) {
       case 'calculate':
         return Icons.calculate;
@@ -1052,6 +1123,16 @@ class StudyMaterial {
       default:
         return Icons.book;
     }
+  }
+
+  static String _getIconString(IconData icon) {
+    if (icon == Icons.calculate) return 'calculate';
+    if (icon == Icons.science) return 'science';
+    if (icon == Icons.eco) return 'eco';
+    if (icon == Icons.biotech) return 'biotech';
+    if (icon == Icons.code) return 'code';
+    if (icon == Icons.menu_book) return 'menu_book';
+    return 'book';
   }
 }
 
@@ -1079,16 +1160,28 @@ class PracticeTest {
   });
 
   factory PracticeTest.fromJson(Map<String, dynamic> json) => PracticeTest(
-    id: json['id'],
-    title: json['title'],
-    subject: json['subject'],
-    questions: json['questions'],
-    duration: json['duration'],
-    difficulty: json['difficulty'],
-    completion: json['completion'].toDouble(),
-    totalMarks: json['total_marks'],
-    description: json['description'],
+    id: json['id']?.toString() ?? '',
+    title: json['title'] ?? '',
+    subject: json['subject'] ?? '',
+    questions: json['questions'] ?? 0,
+    duration: json['duration'] ?? '',
+    difficulty: json['difficulty'] ?? '',
+    completion: json['completion']?.toDouble() ?? 0.0,
+    totalMarks: json['total_marks'] ?? 0,
+    description: json['description'] ?? '',
   );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'subject': subject,
+    'questions': questions,
+    'duration': duration,
+    'difficulty': difficulty,
+    'completion': completion,
+    'total_marks': totalMarks,
+    'description': description,
+  };
 }
 
 class TestQuestion {
@@ -1107,12 +1200,20 @@ class TestQuestion {
   });
 
   factory TestQuestion.fromJson(Map<String, dynamic> json) => TestQuestion(
-    id: json['id'],
-    testId: json['test_id'],
-    question: json['question'],
-    options: List<String>.from(json['options']),
-    correctAnswer: json['correct_answer'],
+    id: json['id']?.toString() ?? '',
+    testId: json['test_id']?.toString() ?? '',
+    question: json['question'] ?? '',
+    options: List<String>.from(json['options'] ?? []),
+    correctAnswer: json['correct_answer'] ?? '',
   );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'test_id': testId,
+    'question': question,
+    'options': options,
+    'correct_answer': correctAnswer,
+  };
 }
 
 // =============================================
@@ -1120,491 +1221,526 @@ class TestQuestion {
 // =============================================
 
 class AuthRepository {
-  final http.Client client;
-
-  AuthRepository(this.client);
-
   Future<ApiResponse<User>> login(LoginRequest request) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/login/'),
-        headers: ApiConfig.headers,
-        body: jsonEncode(request.toJson()),
-      );
+      final credential = await FirebaseConfig.firebaseAuth
+          .signInWithEmailAndPassword(
+            email: request.email,
+            password: request.password,
+          );
+      final userDoc =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(credential.user!.uid)
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<User>.fromJson(json, (data) => User.fromJson(data));
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<User>(
+        success: true,
+        message: 'Login successful',
+        data: User.fromJson({
+          ...userDoc.data()!,
+          'id': credential.user!.uid,
+          'email': credential.user!.email,
+          'is_verified': credential.user!.emailVerified,
+        }),
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<User>> register(RegisterRequest request) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/register/'),
-        headers: ApiConfig.headers,
-        body: jsonEncode(request.toJson()),
-      );
+      final credential = await FirebaseConfig.firebaseAuth
+          .createUserWithEmailAndPassword(
+            email: request.email,
+            password: request.password,
+          );
 
-      if (response.statusCode == 201) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<User>.fromJson(json, (data) => User.fromJson(data));
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final userData = {
+        'email': request.email,
+        'first_name': request.firstName,
+        'last_name': request.lastName,
+        'phone': request.phone,
+        'is_active': true,
+        'is_verified': false,
+        'date_joined': Timestamp.now(),
+        'user_type': 'student',
+      };
+
+      await FirebaseConfig.firestore
+          .collection('users')
+          .doc(credential.user!.uid)
+          .set(userData);
+
+      return ApiResponse<User>(
+        success: true,
+        message: 'Registration successful',
+        data: User.fromJson({...userData, 'id': credential.user!.uid}),
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> sendPasswordResetOtp(String email) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/password/reset/'),
-        headers: ApiConfig.headers,
-        body: jsonEncode({'email': email}),
+      await FirebaseConfig.firebaseAuth.sendPasswordResetEmail(email: email);
+      return ApiResponse<void>(
+        success: true,
+        message: 'Password reset email sent',
       );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<void>.fromJson(json, (data) => null);
-      } else {
-        throw ApiError.fromResponse(response);
-      }
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> verifyOtp(OtpVerification verification) async {
-    try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/otp/verify/'),
-        headers: ApiConfig.headers,
-        body: jsonEncode(verification.toJson()),
-      );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<void>.fromJson(json, (data) => null);
-      } else {
-        throw ApiError.fromResponse(response);
-      }
-    } catch (e) {
-      throw ApiError(message: e.toString());
-    }
+    // Note: Firebase doesn't use OTP for password reset by default
+    // This could be implemented with custom authentication or a third-party service
+    throw ApiError(message: 'OTP verification not implemented with Firebase');
   }
 
   Future<ApiResponse<User>> resetPassword(PasswordResetRequest request) async {
-    try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/password/reset/confirm/'),
-        headers: ApiConfig.headers,
-        body: jsonEncode(request.toJson()),
-      );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<User>.fromJson(json, (data) => User.fromJson(data));
-      } else {
-        throw ApiError.fromResponse(response);
-      }
-    } catch (e) {
-      throw ApiError(message: e.toString());
-    }
+    // Firebase handles password reset via email link, so this would need custom implementation
+    throw ApiError(
+      message: 'Direct password reset not supported with Firebase',
+    );
   }
 
   Future<ApiResponse<User>> getCurrentUser(String token) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/auth/user/'),
-        headers: ApiConfig.authHeaders(token),
-      );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<User>.fromJson(json, (data) => User.fromJson(data));
-      } else {
-        throw ApiError.fromResponse(response);
+      final user = FirebaseConfig.firebaseAuth.currentUser;
+      if (user == null) {
+        throw ApiError(message: 'No user logged in');
       }
+      final userDoc =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
+      return ApiResponse<User>(
+        success: true,
+        message: 'User data retrieved',
+        data: User.fromJson({
+          ...userDoc.data()!,
+          'id': user.uid,
+          'email': user.email,
+          'is_verified': user.emailVerified,
+        }),
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> logout(String token) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/logout/'),
-        headers: ApiConfig.authHeaders(token),
-      );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<void>.fromJson(json, (data) => null);
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      await FirebaseConfig.firebaseAuth.signOut();
+      return ApiResponse<void>(success: true, message: 'Logout successful');
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class AchievementsRepository {
-  final http.Client client;
-
-  AchievementsRepository(this.client);
-
-  Future<ApiResponse<List<Achievement>>> getAchievements(String token) async {
+  Future<ApiResponse<List<Achievement>>> getAchievements(String userId) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/achievements/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(userId)
+              .collection('achievements')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Achievement>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => Achievement.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final achievements =
+          snapshot.docs
+              .map((doc) => Achievement.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Achievement>>(
+        success: true,
+        message: 'Achievements retrieved',
+        data: achievements,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
-  Future<ApiResponse<UserStats>> getUserStats(String token) async {
+  Future<ApiResponse<UserStats>> getUserStats(String userId) async {
+    debugPrint('Getting user stats...');
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/achievements/stats/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final doc =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(userId)
+              .collection('stats')
+              .doc('current')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<UserStats>.fromJson(
-          json,
-          (data) => UserStats.fromJson(data),
+      debugPrint('User stats data: ${doc.data()}');
+
+      if (!doc.exists || doc.data() == null) {
+        // Return default stats if no data exists
+        return ApiResponse<UserStats>(
+          success: true,
+          message: 'Using default stats',
+          data: UserStats(
+            sessionsCompleted: 0,
+            pointsEarned: 0,
+            badgesEarned: 0,
+            averageRating: 0.0,
+            upcomingSessions: 0,
+            pendingSessions: 0,
+          ),
         );
-      } else {
-        throw ApiError.fromResponse(response);
       }
+
+      return ApiResponse<UserStats>(
+        success: true,
+        message: 'User stats retrieved',
+        data: UserStats.fromJson(doc.data()!),
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      debugPrint('Error fetching user stats: $e');
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class LeaderboardRepository {
-  final http.Client client;
-
-  LeaderboardRepository(this.client);
-
-  Future<ApiResponse<List<LeaderboardUser>>> getLeaderboard(
-    String token, {
+  Future<ApiResponse<List<LeaderboardUser>>> getLeaderboard({
     String filter = 'overall',
   }) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/leaderboard/?filter=$filter'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+          .collection('leaderboard')
+          .orderBy('points', descending: true);
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<LeaderboardUser>>.fromJson(
-          json,
-          (data) =>
-              (data as List).map((e) => LeaderboardUser.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
+      if (filter != 'overall') {
+        query = query.where('subject', isEqualTo: filter);
       }
+
+      final snapshot = await query.get();
+      final currentUserId = FirebaseConfig.firebaseAuth.currentUser?.uid;
+
+      final leaderboard =
+          snapshot.docs.asMap().entries.map((entry) {
+            final index = entry.key;
+            final doc = entry.value;
+            return LeaderboardUser.fromJson({
+              ...doc.data(),
+              'id': doc.id,
+              'position': index + 1,
+              'is_current_user': doc.id == currentUserId,
+            });
+          }).toList();
+
+      return ApiResponse<List<LeaderboardUser>>(
+        success: true,
+        message: 'Leaderboard retrieved',
+        data: leaderboard,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
-  Future<ApiResponse<List<LeaderboardUser>>> getTopPerformers(
-    String token,
-  ) async {
+  Future<ApiResponse<List<LeaderboardUser>>> getTopPerformers() async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/leaderboard/top/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('leaderboard')
+              .orderBy('points', descending: true)
+              .limit(10)
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<LeaderboardUser>>.fromJson(
-          json,
-          (data) =>
-              (data as List).map((e) => LeaderboardUser.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final currentUserId = FirebaseConfig.firebaseAuth.currentUser?.uid;
+
+      final topPerformers =
+          snapshot.docs.asMap().entries.map((entry) {
+            final index = entry.key;
+            final doc = entry.value;
+            return LeaderboardUser.fromJson({
+              ...doc.data(),
+              'id': doc.id,
+              'position': index + 1,
+              'is_current_user': doc.id == currentUserId,
+            });
+          }).toList();
+
+      return ApiResponse<List<LeaderboardUser>>(
+        success: true,
+        message: 'Top performers retrieved',
+        data: topPerformers,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class SessionRepository {
-  final http.Client client;
-
-  SessionRepository(this.client);
-
-  Future<ApiResponse<List<Session>>> getUpcomingSessions(String token) async {
+  Future<ApiResponse<List<Session>>> getUpcomingSessions(String userId) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/sessions/upcoming/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('sessions')
+              .where('user_id', isEqualTo: userId)
+              .where('status', isEqualTo: 'upcoming')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Session>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => Session.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final sessions =
+          snapshot.docs
+              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Session>>(
+        success: true,
+        message: 'Upcoming sessions retrieved',
+        data: sessions,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
-  Future<ApiResponse<List<Session>>> getPastSessions(String token) async {
+  Future<ApiResponse<List<Session>>> getPastSessions(String userId) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/sessions/past/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('sessions')
+              .where('user_id', isEqualTo: userId)
+              .where('status', isEqualTo: 'completed')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Session>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => Session.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final sessions =
+          snapshot.docs
+              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Session>>(
+        success: true,
+        message: 'Past sessions retrieved',
+        data: sessions,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
-  Future<ApiResponse<List<Session>>> getPendingSessions(String token) async {
+  Future<ApiResponse<List<Session>>> getPendingSessions(String userId) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/sessions/pending/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('sessions')
+              .where('user_id', isEqualTo: userId)
+              .where('status', isEqualTo: 'pending')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Session>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => Session.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final sessions =
+          snapshot.docs
+              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Session>>(
+        success: true,
+        message: 'Pending sessions retrieved',
+        data: sessions,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<Session>> getSessionDetails(
-    String token,
+    String userId,
     String sessionId,
   ) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/sessions/$sessionId/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final doc =
+          await FirebaseConfig.firestore
+              .collection('sessions')
+              .doc(sessionId)
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<Session>.fromJson(
-          json,
-          (data) => Session.fromJson(data),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
+      if (!doc.exists) {
+        throw ApiError(message: 'Session not found');
       }
+
+      return ApiResponse<Session>(
+        success: true,
+        message: 'Session details retrieved',
+        data: Session.fromJson({...doc.data()!, 'id': doc.id}),
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> cancelSession(
-    String token,
+    String userId,
     String sessionId,
   ) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/sessions/$sessionId/cancel/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      await FirebaseConfig.firestore
+          .collection('sessions')
+          .doc(sessionId)
+          .update({'status': 'declined'});
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<void>.fromJson(json, (data) => null);
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<void>(
+        success: true,
+        message: 'Session cancelled successfully',
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> rescheduleSession(
-    String token,
+    String userId,
     String sessionId,
     DateTime newTime,
   ) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/sessions/$sessionId/reschedule/'),
-        headers: ApiConfig.authHeaders(token),
-        body: jsonEncode({'new_time': newTime.toIso8601String()}),
-      );
+      await FirebaseConfig.firestore
+          .collection('sessions')
+          .doc(sessionId)
+          .update({'start_time': Timestamp.fromDate(newTime)});
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<void>.fromJson(json, (data) => null);
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<void>(
+        success: true,
+        message: 'Session rescheduled successfully',
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> submitFeedback(
-    String token,
+    String userId,
     String sessionId,
     int rating,
     String review,
   ) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/sessions/$sessionId/feedback/'),
-        headers: ApiConfig.authHeaders(token),
-        body: jsonEncode({'rating': rating, 'review': review}),
-      );
+      await FirebaseConfig.firestore
+          .collection('sessions')
+          .doc(sessionId)
+          .update({'rating': rating, 'review': review, 'status': 'completed'});
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<void>.fromJson(json, (data) => null);
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<void>(
+        success: true,
+        message: 'Feedback submitted successfully',
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class HomeRepository {
-  final http.Client client;
-
-  HomeRepository(this.client);
-
-  Future<ApiResponse<UserStats>> getUserStats(String token) async {
+  Future<ApiResponse<UserStats>> getUserStats(String userId) async {
     debugPrint('Getting user stats...');
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/achievements/stats/'),
-        headers: ApiConfig.authHeaders(token),
-      );
-      debugPrint(
-        'User stats response: ${response.statusCode} - ${response.body}',
-      );
+      final doc =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(userId)
+              .collection('stats')
+              .doc('current')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        debugPrint('User stats data: $json');
-        return ApiResponse<UserStats>.fromJson(
-          json,
-          (data) => UserStats.fromJson(data),
+      debugPrint('User stats data: ${doc.data()}');
+
+      if (!doc.exists || doc.data() == null) {
+        // Return default stats if no data exists
+        return ApiResponse<UserStats>(
+          success: true,
+          message: 'Using default stats',
+          data: UserStats(
+            sessionsCompleted: 0,
+            pointsEarned: 0,
+            badgesEarned: 0,
+            averageRating: 0.0,
+            upcomingSessions: 0,
+            pendingSessions: 0,
+          ),
         );
-      } else {
-        throw ApiError.fromResponse(response);
       }
+
+      return ApiResponse<UserStats>(
+        success: true,
+        message: 'User stats retrieved',
+        data: UserStats.fromJson(doc.data()!),
+      );
     } catch (e) {
       debugPrint('Error fetching user stats: $e');
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
-  Future<ApiResponse<List<Activity>>> getRecentActivities(
-    String token, {
+  Future<ApiResponse<List<Activity>>> getRecentActivities({
+    String? userId,
     int limit = 5,
   }) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/home/activities/?limit=$limit'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(userId)
+              .collection('activities')
+              .orderBy('time', descending: true)
+              .limit(limit)
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Activity>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => Activity.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final activities =
+          snapshot.docs
+              .map((doc) => Activity.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Activity>>(
+        success: true,
+        message: 'Recent activities retrieved',
+        data: activities,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<List<Session>>> getUpcomingSessionsPreview(
-    String token,
+    String userId,
   ) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/sessions/upcoming/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('sessions')
+              .where('user_id', isEqualTo: userId)
+              .where('status', isEqualTo: 'upcoming')
+              .limit(5)
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Session>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => Session.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final sessions =
+          snapshot.docs
+              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Session>>(
+        success: true,
+        message: 'Upcoming sessions preview retrieved',
+        data: sessions,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class TutorRepository {
-  final http.Client client;
-
-  TutorRepository(this.client);
-
   Future<ApiResponse<List<Tutor>>> getTutors({
     String? subject,
     String? availability,
@@ -1613,57 +1749,58 @@ class TutorRepository {
     int offset = 0,
   }) async {
     try {
-      final params = {
-        if (subject != null && subject.isNotEmpty) 'subject': subject,
-        if (availability != null && availability.isNotEmpty)
-          'availability': availability,
-        if (minRating != null) 'min_rating': minRating.toString(),
-        'limit': limit.toString(),
-        'offset': offset.toString(),
-      };
+      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+          .collection('tutors')
+          .limit(limit);
 
-      final uri = Uri.parse(
-        '${ApiConfig.baseUrl}/tutors/',
-      ).replace(queryParameters: params);
-      final response = await client.get(uri, headers: ApiConfig.headers);
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Tutor>>.fromJson(
-          json,
-          (data) => List<Tutor>.from(data.map((x) => Tutor.fromJson(x))),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
+      if (subject != null && subject.isNotEmpty) {
+        query = query.where('subjects', arrayContains: subject);
       }
+      if (minRating != null) {
+        query = query.where('rating', isGreaterThanOrEqualTo: minRating);
+      }
+
+      final snapshot = await query.get();
+
+      final tutors =
+          snapshot.docs
+              .map((doc) => Tutor.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Tutor>>(
+        success: true,
+        message: 'Tutors retrieved',
+        data: tutors,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<Tutor>> getTutorDetails(String tutorId) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/tutors/$tutorId/'),
-        headers: ApiConfig.headers,
-      );
+      final doc =
+          await FirebaseConfig.firestore
+              .collection('tutors')
+              .doc(tutorId)
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<Tutor>.fromJson(
-          json,
-          (data) => Tutor.fromJson(data),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
+      if (!doc.exists) {
+        throw ApiError(message: 'Tutor not found');
       }
+
+      return ApiResponse<Tutor>(
+        success: true,
+        message: 'Tutor details retrieved',
+        data: Tutor.fromJson({...doc.data()!, 'id': doc.id}),
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<TutorApplication>> submitTutorApplication({
-    required String token,
+    required String userId,
     required Map<String, dynamic> personalInfo,
     required List<String> subjects,
     required Map<String, List<String>> availability,
@@ -1671,61 +1808,61 @@ class TutorRepository {
     String? venue,
   }) async {
     try {
-      final payload = {
+      final applicationData = {
+        'user_id': userId,
+        'status': 'pending',
         'personal_info': personalInfo,
         'subjects': subjects,
         'availability': availability,
-        if (teachingMode != null) 'teaching_mode': teachingMode,
-        if (venue != null) 'venue': venue,
+        'teaching_mode': teachingMode,
+        'venue': venue,
+        'submitted_at': Timestamp.now(),
       };
 
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/tutors/applications/'),
-        headers: ApiConfig.authHeaders(token),
-        body: jsonEncode(payload),
-      );
+      final ref = await FirebaseConfig.firestore
+          .collection('tutor_applications')
+          .add(applicationData);
 
-      if (response.statusCode == 201) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<TutorApplication>.fromJson(
-          json,
-          (data) => TutorApplication.fromJson(data),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<TutorApplication>(
+        success: true,
+        message: 'Application submitted successfully',
+        data: TutorApplication.fromJson({...applicationData, 'id': ref.id}),
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<List<TutorApplication>>> getTutorApplications(
-    String token,
+    String userId,
   ) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/tutors/applications/'),
-        headers: ApiConfig.authHeaders(token),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('tutor_applications')
+              .where('user_id', isEqualTo: userId)
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<TutorApplication>>.fromJson(
-          json,
-          (data) => List<TutorApplication>.from(
-            data.map((x) => TutorApplication.fromJson(x)),
-          ),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final applications =
+          snapshot.docs
+              .map(
+                (doc) =>
+                    TutorApplication.fromJson({...doc.data(), 'id': doc.id}),
+              )
+              .toList();
+
+      return ApiResponse<List<TutorApplication>>(
+        success: true,
+        message: 'Tutor applications retrieved',
+        data: applications,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> bookTutorSession({
-    required String token,
+    required String userId,
     required String tutorId,
     required String subject,
     required DateTime dateTime,
@@ -1734,324 +1871,339 @@ class TutorRepository {
     String? description,
   }) async {
     try {
-      final payload = {
+      final sessionData = {
+        'user_id': userId,
         'tutor_id': tutorId,
         'subject': subject,
-        'date_time': dateTime.toIso8601String(),
-        'duration': duration,
+        'start_time': Timestamp.fromDate(dateTime),
+        'duration_minutes': int.parse(duration),
         'platform': platform,
-        if (description != null) 'description': description,
+        'description': description,
+        'status': 'pending',
+        'is_current_user': true,
       };
 
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/tutors/$tutorId/book/'),
-        headers: ApiConfig.authHeaders(token),
-        body: jsonEncode(payload),
-      );
+      await FirebaseConfig.firestore.collection('sessions').add(sessionData);
 
-      if (response.statusCode == 201) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<void>.fromJson(json, (data) => null);
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<void>(
+        success: true,
+        message: 'Session booked successfully',
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> requestTutor({
-    required String token,
+    required String userId,
     required String subject,
     required String details,
     String? priority,
   }) async {
     try {
-      final payload = {
+      final requestData = {
+        'user_id': userId,
         'subject': subject,
         'details': details,
-        if (priority != null) 'priority': priority,
+        'priority': priority,
+        'created_at': Timestamp.now(),
       };
 
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/tutors/requests/'),
-        headers: ApiConfig.authHeaders(token),
-        body: jsonEncode(payload),
-      );
+      await FirebaseConfig.firestore
+          .collection('tutor_requests')
+          .add(requestData);
 
-      if (response.statusCode == 201) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<void>.fromJson(json, (data) => null);
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<void>(
+        success: true,
+        message: 'Tutor request submitted successfully',
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class ChatRepository {
-  final http.Client client;
-  final String authToken;
-
-  ChatRepository(this.client, this.authToken);
-
-  Future<ApiResponse<List<Chat>>> getChats() async {
+  Future<ApiResponse<List<Chat>>> getChats(String userId) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/chats/'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(userId)
+              .collection('chats')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Chat>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => Chat.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final chats =
+          snapshot.docs
+              .map((doc) => Chat.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Chat>>(
+        success: true,
+        message: 'Chats retrieved',
+        data: chats,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<List<Message>>> getMessages(String chatId) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/chats/$chatId/messages/'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('chats')
+              .doc(chatId)
+              .collection('messages')
+              .orderBy('time')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<Message>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => Message.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final messages =
+          snapshot.docs
+              .map((doc) => Message.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Message>>(
+        success: true,
+        message: 'Messages retrieved',
+        data: messages,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<Message>> sendMessage(Message message) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/chats/${message.chatId}/messages/'),
-        headers: ApiConfig.authHeaders(authToken),
-        body: jsonEncode(message.toJson()),
-      );
+      final messageData = message.toJson();
+      messageData['time'] = Timestamp.now();
 
-      if (response.statusCode == 201) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<Message>.fromJson(
-          json,
-          (data) => Message.fromJson(data),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final ref = await FirebaseConfig.firestore
+          .collection('chats')
+          .doc(message.chatId)
+          .collection('messages')
+          .add(messageData);
+
+      return ApiResponse<Message>(
+        success: true,
+        message: 'Message sent successfully',
+        data: Message.fromJson({...messageData, 'id': ref.id}),
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class AnalyticsRepository {
-  final http.Client client;
-  final String authToken;
-
-  AnalyticsRepository(this.client, this.authToken);
-
-  Future<ApiResponse<List<WeeklyActivity>>> getWeeklyActivity() async {
+  Future<ApiResponse<List<WeeklyActivity>>> getWeeklyActivity(
+    String userId,
+  ) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/analytics/weekly-activity/'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(userId)
+              .collection('analytics')
+              .doc('weekly_activity')
+              .collection('days')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<WeeklyActivity>>.fromJson(
-          json,
-          (data) =>
-              (data as List).map((e) => WeeklyActivity.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final activities =
+          snapshot.docs
+              .map((doc) => WeeklyActivity.fromJson(doc.data()))
+              .toList();
+
+      return ApiResponse<List<WeeklyActivity>>(
+        success: true,
+        message: 'Weekly activity retrieved',
+        data: activities,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
-  Future<ApiResponse<List<SubjectDistribution>>>
-  getSubjectDistribution() async {
+  Future<ApiResponse<List<SubjectDistribution>>> getSubjectDistribution(
+    String userId,
+  ) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/analytics/subject-distribution/'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(userId)
+              .collection('analytics')
+              .doc('subject_distribution')
+              .collection('subjects')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<SubjectDistribution>>.fromJson(
-          json,
-          (data) =>
-              (data as List)
-                  .map((e) => SubjectDistribution.fromJson(e))
-                  .toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final distributions =
+          snapshot.docs
+              .map((doc) => SubjectDistribution.fromJson(doc.data()))
+              .toList();
+
+      return ApiResponse<List<SubjectDistribution>>(
+        success: true,
+        message: 'Subject distribution retrieved',
+        data: distributions,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<List<TutorPerformance>>> getTutorPerformance() async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/analytics/tutor-performance/'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('analytics')
+              .doc('tutor_performance')
+              .collection('tutors')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<TutorPerformance>>.fromJson(
-          json,
-          (data) =>
-              (data as List).map((e) => TutorPerformance.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final performances =
+          snapshot.docs
+              .map(
+                (doc) => TutorPerformance.fromJson({
+                  ...doc.data(),
+                  'tutor_id': doc.id,
+                }),
+              )
+              .toList();
+
+      return ApiResponse<List<TutorPerformance>>(
+        success: true,
+        message: 'Tutor performance retrieved',
+        data: performances,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class SavedItemsRepository {
-  final http.Client client;
-  final String authToken;
-
-  SavedItemsRepository(this.client, this.authToken);
-
-  Future<ApiResponse<List<SavedItem>>> getSavedItems(String type) async {
+  Future<ApiResponse<List<SavedItem>>> getSavedItems(
+    String userId,
+    String type,
+  ) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/saved-items/?type=$type'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+          .collection('users')
+          .doc(userId)
+          .collection('saved_items');
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<SavedItem>>.fromJson(
-          json,
-          (data) => (data as List).map((e) => SavedItem.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
+      if (type.isNotEmpty) {
+        query = query.where('type', isEqualTo: type);
       }
+
+      final snapshot = await query.get();
+
+      final items =
+          snapshot.docs
+              .map((doc) => SavedItem.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<SavedItem>>(
+        success: true,
+        message: 'Saved items retrieved',
+        data: items,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
-  Future<ApiResponse<void>> removeSavedItem(String itemId) async {
+  Future<ApiResponse<void>> removeSavedItem(
+    String userId,
+    String itemId,
+  ) async {
     try {
-      final response = await client.delete(
-        Uri.parse('${ApiConfig.baseUrl}/saved-items/$itemId/'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      await FirebaseConfig.firestore
+          .collection('users')
+          .doc(userId)
+          .collection('saved_items')
+          .doc(itemId)
+          .delete();
 
-      if (response.statusCode == 204) {
-        return ApiResponse<void>(
-          success: true,
-          message: 'Item removed successfully',
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<void>(
+        success: true,
+        message: 'Item removed successfully',
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class StudyMaterialsRepository {
-  final http.Client client;
-  final String authToken;
-
-  StudyMaterialsRepository(this.client, this.authToken);
-
-  Future<ApiResponse<List<StudyMaterial>>> getStudyMaterials() async {
+  Future<ApiResponse<List<StudyMaterial>>> getStudyMaterials(
+    String userId,
+  ) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/study-materials/'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(userId)
+              .collection('study_materials')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<StudyMaterial>>.fromJson(
-          json,
-          (data) =>
-              (data as List).map((e) => StudyMaterial.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final materials =
+          snapshot.docs
+              .map(
+                (doc) => StudyMaterial.fromJson({...doc.data(), 'id': doc.id}),
+              )
+              .toList();
+
+      return ApiResponse<List<StudyMaterial>>(
+        success: true,
+        message: 'Study materials retrieved',
+        data: materials,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }
 
 class PracticeTestsRepository {
-  final http.Client client;
-  final String authToken;
-
-  PracticeTestsRepository(this.client, this.authToken);
-
   Future<ApiResponse<List<PracticeTest>>> getPracticeTests({
+    String? userId,
     String? subject,
     String? difficulty,
     String? sortBy,
   }) async {
     try {
-      final queryParams = {
-        if (subject != null && subject != 'All') 'subject': subject,
-        if (difficulty != null && difficulty != 'All') 'difficulty': difficulty,
-        if (sortBy != null) 'sort_by': sortBy,
-      };
-
-      final response = await client.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}/practice-tests/',
-        ).replace(queryParameters: queryParams),
-        headers: ApiConfig.authHeaders(authToken),
+      Query<Map<String, dynamic>> query = FirebaseConfig.firestore.collection(
+        'practice_tests',
       );
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<PracticeTest>>.fromJson(
-          json,
-          (data) =>
-              (data as List).map((e) => PracticeTest.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
+      if (subject != null && subject != 'All') {
+        query = query.where('subject', isEqualTo: subject);
       }
+      if (difficulty != null && difficulty != 'All') {
+        query = query.where('difficulty', isEqualTo: difficulty);
+      }
+      if (sortBy != null) {
+        query = query.orderBy(sortBy);
+      }
+
+      final snapshot = await query.get();
+
+      final tests =
+          snapshot.docs
+              .map(
+                (doc) => PracticeTest.fromJson({...doc.data(), 'id': doc.id}),
+              )
+              .toList();
+
+      return ApiResponse<List<PracticeTest>>(
+        success: true,
+        message: 'Practice tests retrieved',
+        data: tests,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
@@ -2059,51 +2211,54 @@ class PracticeTestsRepository {
     String testId,
   ) async {
     try {
-      final response = await client.get(
-        Uri.parse('${ApiConfig.baseUrl}/practice-tests/$testId/questions/'),
-        headers: ApiConfig.authHeaders(authToken),
-      );
+      final snapshot =
+          await FirebaseConfig.firestore
+              .collection('practice_tests')
+              .doc(testId)
+              .collection('questions')
+              .get();
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponse<List<TestQuestion>>.fromJson(
-          json,
-          (data) =>
-              (data as List).map((e) => TestQuestion.fromJson(e)).toList(),
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      final questions =
+          snapshot.docs
+              .map(
+                (doc) => TestQuestion.fromJson({...doc.data(), 'id': doc.id}),
+              )
+              .toList();
+
+      return ApiResponse<List<TestQuestion>>(
+        success: true,
+        message: 'Test questions retrieved',
+        data: questions,
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 
   Future<ApiResponse<void>> submitTestAnswers(
     String testId,
     Map<int, String> answers,
+    String userId,
   ) async {
     try {
-      final response = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/practice-tests/$testId/submit/'),
-        headers: ApiConfig.authHeaders(authToken),
-        body: jsonEncode({
-          'answers': answers.map(
-            (key, value) => MapEntry(key.toString(), value),
-          ),
-        }),
-      );
+      await FirebaseConfig.firestore
+          .collection('users')
+          .doc(userId)
+          .collection('test_submissions')
+          .add({
+            'test_id': testId,
+            'answers': answers.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+            'submitted_at': Timestamp.now(),
+          });
 
-      if (response.statusCode == 200) {
-        return ApiResponse<void>(
-          success: true,
-          message: 'Test submitted successfully',
-        );
-      } else {
-        throw ApiError.fromResponse(response);
-      }
+      return ApiResponse<void>(
+        success: true,
+        message: 'Test submitted successfully',
+      );
     } catch (e) {
-      throw ApiError(message: e.toString());
+      throw ApiError.fromFirebaseException(e);
     }
   }
 }

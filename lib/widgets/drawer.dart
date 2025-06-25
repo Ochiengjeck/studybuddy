@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:studybuddy/screens/auth/log_in.dart';
+
+import '../utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../utils/providers/providers.dart';
 
 class CustomDrawer extends StatefulWidget {
   final int currentIndex;
@@ -34,6 +38,23 @@ class _CustomDrawerState extends State<CustomDrawer>
       CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
     );
     _slideController.forward();
+
+    // Load initial data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      final homeProvider = Provider.of<HomeProvider>(context, listen: false);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      final sessionProvider = Provider.of<SessionProvider>(
+        context,
+        listen: false,
+      );
+
+      if (appProvider.currentUser != null) {
+        homeProvider.loadHomeData(appProvider.currentUser!.id);
+        chatProvider.loadChats(appProvider.currentUser!.id);
+        sessionProvider.loadPendingSessions(appProvider.currentUser!.id);
+      }
+    });
   }
 
   @override
@@ -96,13 +117,31 @@ class _CustomDrawerState extends State<CustomDrawer>
                 ),
               ),
               ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  // Perform logout logic here\
-                  Navigator.pushReplacement(
+                onPressed: () async {
+                  final authProvider = Provider.of<AuthProvider>(
                     context,
-                    MaterialPageRoute(builder: (context) => LoginScreen()),
+                    listen: false,
                   );
+                  try {
+                    await authProvider.logout();
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Logout failed: ${e.toString()}'),
+                        ),
+                      );
+                    }
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
@@ -146,239 +185,297 @@ class _CustomDrawerState extends State<CustomDrawer>
           ],
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(context),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  children: [
-                    _buildSectionHeader('Navigation'),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.dashboard_rounded,
-                      title: 'Dashboard',
-                      subtitle: 'Overview & Stats',
-                      index: 0,
-                      isSelected: widget.currentIndex == 0,
+          child: Consumer<AppProvider>(
+            builder: (context, appProvider, child) {
+              if (appProvider.isInitializing) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (appProvider.initializationError != null) {
+                return Center(
+                  child: Text('Error: ${appProvider.initializationError}'),
+                );
+              }
+              if (appProvider.currentUser == null) {
+                return const Center(child: Text('Please log in'));
+              }
+              return Column(
+                children: [
+                  _buildHeader(context, appProvider.currentUser!),
+                  Expanded(
+                    child: Consumer2<ChatProvider, SessionProvider>(
+                      builder: (context, chatProvider, sessionProvider, child) {
+                        return ListView(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          children: [
+                            _buildSectionHeader('Navigation'),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.dashboard_rounded,
+                              title: 'Dashboard',
+                              subtitle: 'Overview & Stats',
+                              index: 0,
+                              isSelected: widget.currentIndex == 0,
+                            ),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.school_rounded,
+                              title: 'My Sessions',
+                              subtitle: 'Upcoming & Past',
+                              index: 1,
+                              isSelected: widget.currentIndex == 1,
+                              badge:
+                                  sessionProvider.pendingSessions?.length
+                                      .toString(),
+                            ),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.person_search_rounded,
+                              title: 'Find Tutors',
+                              subtitle: 'Browse Experts',
+                              index: 2,
+                              isSelected: widget.currentIndex == 2,
+                            ),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.chat_bubble_rounded,
+                              title: 'Messages',
+                              subtitle: 'Chat & Support',
+                              index: 3,
+                              isSelected: widget.currentIndex == 3,
+                              badge:
+                                  chatProvider.chats
+                                      ?.fold<int>(
+                                        0,
+                                        (sum, chat) => sum + chat.unreadCount,
+                                      )
+                                      .toString(),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildSectionHeader('Progress'),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.emoji_events_rounded,
+                              title: 'Achievements',
+                              subtitle: 'Badges & Rewards',
+                              index: 4,
+                              isSelected: widget.currentIndex == 4,
+                            ),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.leaderboard_rounded,
+                              title: 'Leaderboard',
+                              subtitle: 'Rankings & Stats',
+                              index: 5,
+                              isSelected: widget.currentIndex == 5,
+                            ),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.analytics_rounded,
+                              title: 'Analytics',
+                              subtitle: 'Study Insights',
+                              index: 7,
+                              isSelected: widget.currentIndex == 7,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildSectionHeader('Learning'),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.library_books_rounded,
+                              title: 'Study Materials',
+                              subtitle: 'Books & Resources',
+                              index: 8,
+                              isSelected: widget.currentIndex == 8,
+                            ),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.quiz_rounded,
+                              title: 'Practice Tests',
+                              subtitle: 'Quizzes & Exams',
+                              index: 9,
+                              isSelected: widget.currentIndex == 9,
+                            ),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.bookmark_rounded,
+                              title: 'Saved Items',
+                              subtitle: 'Bookmarks & Notes',
+                              index: 10,
+                              isSelected: widget.currentIndex == 10,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildSectionHeader('Account'),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.settings_rounded,
+                              title: 'Settings',
+                              subtitle: 'Preferences',
+                              index: 6,
+                              isSelected: widget.currentIndex == 6,
+                            ),
+                            _buildDrawerItem(
+                              context,
+                              icon: Icons.help_outline_rounded,
+                              title: 'Help & Support',
+                              subtitle: 'FAQ & Contact',
+                              index: 11,
+                              isSelected: widget.currentIndex == 11,
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.school_rounded,
-                      title: 'My Sessions',
-                      subtitle: 'Upcoming & Past',
-                      index: 1,
-                      isSelected: widget.currentIndex == 1,
-                      badge: '3',
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.person_search_rounded,
-                      title: 'Find Tutors',
-                      subtitle: 'Browse Experts',
-                      index: 2,
-                      isSelected: widget.currentIndex == 2,
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.chat_bubble_rounded,
-                      title: 'Messages',
-                      subtitle: 'Chat & Support',
-                      index: 3,
-                      isSelected: widget.currentIndex == 3,
-                      badge: '2',
-                    ),
-
-                    const SizedBox(height: 16),
-                    _buildSectionHeader('Progress'),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.emoji_events_rounded,
-                      title: 'Achievements',
-                      subtitle: 'Badges & Rewards',
-                      index: 4,
-                      isSelected: widget.currentIndex == 4,
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.leaderboard_rounded,
-                      title: 'Leaderboard',
-                      subtitle: 'Rankings & Stats',
-                      index: 5,
-                      isSelected: widget.currentIndex == 5,
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.analytics_rounded,
-                      title: 'Analytics',
-                      subtitle: 'Study Insights',
-                      index: 7,
-                      isSelected: widget.currentIndex == 7,
-                    ),
-
-                    const SizedBox(height: 16),
-                    _buildSectionHeader('Learning'),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.library_books_rounded,
-                      title: 'Study Materials',
-                      subtitle: 'Books & Resources',
-                      index: 8,
-                      isSelected: widget.currentIndex == 8,
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.quiz_rounded,
-                      title: 'Practice Tests',
-                      subtitle: 'Quizzes & Exams',
-                      index: 9,
-                      isSelected: widget.currentIndex == 9,
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.bookmark_rounded,
-                      title: 'Saved Items',
-                      subtitle: 'Bookmarks & Notes',
-                      index: 10,
-                      isSelected: widget.currentIndex == 10,
-                    ),
-
-                    const SizedBox(height: 16),
-                    _buildSectionHeader('Account'),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.settings_rounded,
-                      title: 'Settings',
-                      subtitle: 'Preferences',
-                      index: 6,
-                      isSelected: widget.currentIndex == 6,
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: Icons.help_outline_rounded,
-                      title: 'Help & Support',
-                      subtitle: 'FAQ & Contact',
-                      index: 11,
-                      isSelected: widget.currentIndex == 11,
-                    ),
-                  ],
-                ),
-              ),
-              _buildFooter(context),
-            ],
+                  ),
+                  _buildFooter(context),
+                ],
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).primaryColor,
-            Theme.of(context).primaryColor.withOpacity(0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(24),
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      margin: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
+  Widget _buildHeader(BuildContext context, User user) {
+    return Consumer<HomeProvider>(
+      builder: (context, homeProvider, child) {
+        final userStats = homeProvider.userStats;
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).primaryColor,
+                Theme.of(context).primaryColor.withOpacity(0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(24),
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24),
+            ),
+          ),
+          margin: const EdgeInsets.all(16),
+          child: Column(
             children: [
-              Hero(
-                tag: 'drawer_avatar',
-                child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      'JD',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'John Doe',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
+              Row(
+                children: [
+                  Hero(
+                    tag: 'drawer_avatar',
+                    child: Container(
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        image:
+                            user.profilePicture != null
+                                ? DecorationImage(
+                                  image: NetworkImage(user.profilePicture!),
+                                  fit: BoxFit.cover,
+                                )
+                                : null,
                       ),
-                      child: Text(
-                        'Premium Student',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child:
+                          user.profilePicture == null
+                              ? Center(
+                                child: Text(
+                                  user.fullName.isNotEmpty
+                                      ? user.fullName
+                                          .split(' ')
+                                          .map((e) => e.isNotEmpty ? e[0] : '')
+                                          .take(2)
+                                          .join()
+                                      : 'U',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).primaryColor,
+                                  ),
+                                ),
+                              )
+                              : null,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.fullName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: Text(
+                              user.userType?.toUpperCase() ?? 'Student',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _buildStatCard(
+                    context,
+                    icon: Icons.access_time_rounded,
+                    label: 'Study Hours',
+                    value:
+                        userStats != null
+                            ? '${(userStats.sessionsCompleted * 1).toStringAsFixed(1)}h'
+                            : '0h',
+                  ),
+                  const SizedBox(width: 12),
+                  _buildStatCard(
+                    context,
+                    icon: Icons.trending_up_rounded,
+                    label: 'Progress',
+                    value:
+                        userStats != null
+                            ? '${(userStats.averageRating * 20).toInt()}%'
+                            : '0%',
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatCard(
-                context,
-                icon: Icons.access_time_rounded,
-                label: 'Study Hours',
-                value: '24h',
-              ),
-              const SizedBox(width: 12),
-              _buildStatCard(
-                context,
-                icon: Icons.trending_up_rounded,
-                label: 'Progress',
-                value: '85%',
-              ),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -515,7 +612,7 @@ class _CustomDrawerState extends State<CustomDrawer>
                     ],
                   ),
                 ),
-                if (badge != null)
+                if (badge != null && badge != '0')
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
