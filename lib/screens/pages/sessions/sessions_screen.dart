@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-
+import 'package:provider/provider.dart';
+import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../../../utils/providers/providers.dart';
 import '../../../widgets/session_card.dart';
 import 'virtual_meeting_screen.dart';
 import 'booking_details_screen.dart';
 import 'session_details_screen.dart';
+import 'apply_for_session_screen.dart';
+import 'organize_session_screen.dart';
 
 class SessionsScreen extends StatefulWidget {
   const SessionsScreen({super.key});
@@ -15,100 +19,101 @@ class SessionsScreen extends StatefulWidget {
 class _SessionsScreenState extends State<SessionsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late SessionProvider _sessionProvider;
+  late String _userId;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    _userId = appProvider.currentUser?.id ?? '';
+
+    // Load initial data
+    _loadSessions();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Future<void> _loadSessions() async {
+    await _sessionProvider.loadUpcomingSessions(_userId);
+    await _sessionProvider.loadPastSessions(_userId);
+    await _sessionProvider.loadPendingSessions(_userId);
   }
 
-  void _navigateToSessionScreen({
-    required String sessionTitle,
-    required String status,
-    required String tutorName,
-    required String tutorImage,
-    required String platform,
-    required String dateTime,
-    required String duration,
-    required String description,
-  }) {
-    switch (status.toLowerCase()) {
-      case 'tomorrow':
-      case 'upcoming':
+  void _navigateToSessionScreen(Session session) {
+    switch (session.status) {
+      case SessionStatus.upcoming:
+      case SessionStatus.inProgress:
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => VirtualMeetingScreen(
-                  sessionTitle: sessionTitle,
-                  tutorName: tutorName,
-                  tutorImage: tutorImage,
-                  platform: platform,
-                  dateTime: dateTime,
-                  duration: duration,
-                  description: description,
-                ),
+            builder: (context) => VirtualMeetingScreen(session: session),
           ),
         );
         break;
-      case 'pending':
+      case SessionStatus.pending:
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => BookingDetailsScreen(
-                  sessionTitle: sessionTitle,
-                  tutorName: tutorName,
-                  tutorImage: tutorImage,
-                  platform: platform,
-                  dateTime: dateTime,
-                  duration: duration,
-                  description: description,
-                ),
+            builder: (context) => BookingDetailsScreen(session: session),
           ),
         );
         break;
-      case 'completed':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) => SessionDetailsScreen(
-                  sessionTitle: sessionTitle,
-                  tutorName: tutorName,
-                  tutorImage: tutorImage,
-                  platform: platform,
-                  dateTime: dateTime,
-                  duration: duration,
-                  description: description,
-                ),
-          ),
-        );
-        break;
+      case SessionStatus.completed:
+      case SessionStatus.declined:
       default:
-        // Default to session details for unknown status
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => SessionDetailsScreen(
-                  sessionTitle: sessionTitle,
-                  tutorName: tutorName,
-                  tutorImage: tutorImage,
-                  platform: platform,
-                  dateTime: dateTime,
-                  duration: duration,
-                  description: description,
-                ),
+            builder: (context) => SessionDetailsScreen(session: session),
           ),
         );
     }
+  }
+
+  void _navigateToApplyForSession() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ApplyForSessionScreen()),
+    );
+  }
+
+  void _navigateToOrganizeSession() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const OrganizeSessionScreen()),
+    );
+  }
+
+  Widget _buildSessionList(List<Session>? sessions) {
+    if (sessions == null || sessions.isEmpty) {
+      return const Center(child: Text('No sessions found'));
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children:
+            sessions.map((session) {
+              return GestureDetector(
+                onTap: () => _navigateToSessionScreen(session),
+                child: SessionCard(
+                  title: session.title,
+                  status: session.statusText,
+                  statusColor: session.statusColor,
+                  dateTime: session.formattedDateTime,
+                  duration: session.formattedDuration,
+                  tutorName: session.tutorName,
+                  tutorImage: session.tutorImage,
+                  platform: session.platform,
+                  description: session.description,
+                  participants: session.participantImages,
+                  showActions: true,
+                ),
+              );
+            }).toList(),
+      ),
+    );
   }
 
   @override
@@ -130,227 +135,53 @@ class _SessionsScreenState extends State<SessionsScreen>
             ],
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // Upcoming Tab
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap:
-                            () => _navigateToSessionScreen(
-                              sessionTitle: 'Python Programming Basics',
-                              status: 'Tomorrow',
-                              tutorName: 'Michael Chen',
-                              tutorImage:
-                                  'https://picsum.photos/200/200?random=13',
-                              platform: 'Google Meet',
-                              dateTime: 'Tomorrow, 5:00 PM',
-                              duration: '90 minutes',
-                              description:
-                                  'Introduction to Python syntax, data structures, and basic algorithms.',
-                            ),
-                        child: SessionCard(
-                          title: 'Python Programming Basics',
-                          status: 'Tomorrow',
-                          statusColor: Colors.orange,
-                          dateTime: 'Tomorrow, 5:00 PM',
-                          duration: '90 minutes',
-                          tutorName: 'Michael Chen',
-                          tutorImage: 'https://picsum.photos/200/200?random=13',
-                          platform: 'Google Meet',
-                          description:
-                              'Introduction to Python syntax, data structures, and basic algorithms.',
-                          participants: [
-                            'https://picsum.photos/200/200?random=3',
-                          ],
-                          showActions: true,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap:
-                            () => _navigateToSessionScreen(
-                              sessionTitle: 'Advanced JavaScript Concepts',
-                              status: 'Tomorrow',
-                              tutorName: 'Sarah Johnson',
-                              tutorImage:
-                                  'https://picsum.photos/200/200?random=14',
-                              platform: 'Zoom',
-                              dateTime: 'Tomorrow, 7:00 PM',
-                              duration: '120 minutes',
-                              description:
-                                  'Deep dive into closures, async/await, and modern ES6+ features.',
-                            ),
-                        child: SessionCard(
-                          title: 'Advanced JavaScript Concepts',
-                          status: 'Tomorrow',
-                          statusColor: Colors.orange,
-                          dateTime: 'Tomorrow, 7:00 PM',
-                          duration: '120 minutes',
-                          tutorName: 'Sarah Johnson',
-                          tutorImage: 'https://picsum.photos/200/200?random=14',
-                          platform: 'Zoom',
-                          description:
-                              'Deep dive into closures, async/await, and modern ES6+ features.',
-                          participants: [
-                            'https://picsum.photos/200/200?random=1',
-                          ],
-                          showActions: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Past Tab
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap:
-                            () => _navigateToSessionScreen(
-                              sessionTitle: 'Organic Chemistry Review',
-                              status: 'Completed',
-                              tutorName: 'David Lee',
-                              tutorImage:
-                                  'https://picsum.photos/200/200?random=13',
-                              platform: 'Google Meet',
-                              dateTime: 'Oct 9, 2:00 PM',
-                              duration: '90 minutes',
-                              description:
-                                  'Covered functional groups, reaction mechanisms, and stereochemistry concepts.',
-                            ),
-                        child: SessionCard(
-                          title: 'Organic Chemistry Review',
-                          status: 'Completed',
-                          statusColor: Colors.green,
-                          dateTime: 'Oct 9, 2:00 PM',
-                          duration: '90 minutes',
-                          tutorName: 'David Lee',
-                          tutorImage: 'https://picsum.photos/200/200?random=13',
-                          platform: 'Google Meet',
-                          description:
-                              'Covered functional groups, reaction mechanisms, and stereochemistry concepts.',
-                          participants: [
-                            'https://picsum.photos/200/200?random=5',
-                          ],
-                          showActions: true,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap:
-                            () => _navigateToSessionScreen(
-                              sessionTitle: 'Calculus Integration Techniques',
-                              status: 'Completed',
-                              tutorName: 'Emily Rodriguez',
-                              tutorImage:
-                                  'https://picsum.photos/200/200?random=15',
-                              platform: 'Microsoft Teams',
-                              dateTime: 'Oct 7, 3:30 PM',
-                              duration: '75 minutes',
-                              description:
-                                  'Integration by parts, substitution methods, and partial fractions.',
-                            ),
-                        child: SessionCard(
-                          title: 'Calculus Integration Techniques',
-                          status: 'Completed',
-                          statusColor: Colors.green,
-                          dateTime: 'Oct 7, 3:30 PM',
-                          duration: '75 minutes',
-                          tutorName: 'Emily Rodriguez',
-                          tutorImage: 'https://picsum.photos/200/200?random=15',
-                          platform: 'Microsoft Teams',
-                          description:
-                              'Integration by parts, substitution methods, and partial fractions.',
-                          participants: [
-                            'https://picsum.photos/200/200?random=6',
-                          ],
-                          showActions: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Requests Tab
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap:
-                            () => _navigateToSessionScreen(
-                              sessionTitle: 'Machine Learning Fundamentals',
-                              status: 'Pending',
-                              tutorName: 'Alex Kumar',
-                              tutorImage:
-                                  'https://picsum.photos/200/200?random=16',
-                              platform: 'Google Meet',
-                              dateTime: 'Oct 15, 4:00 PM',
-                              duration: '105 minutes',
-                              description:
-                                  'Introduction to supervised learning, neural networks, and model evaluation.',
-                            ),
-                        child: SessionCard(
-                          title: 'Machine Learning Fundamentals',
-                          status: 'Pending',
-                          statusColor: Colors.orange,
-                          dateTime: 'Oct 15, 4:00 PM',
-                          duration: '105 minutes',
-                          tutorName: 'Alex Kumar',
-                          tutorImage: 'https://picsum.photos/200/200?random=16',
-                          platform: 'Google Meet',
-                          description:
-                              'Introduction to supervised learning, neural networks, and model evaluation.',
-                          participants: [
-                            'https://picsum.photos/200/200?random=7',
-                          ],
-                          showActions: true,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap:
-                            () => _navigateToSessionScreen(
-                              sessionTitle: 'Database Design Principles',
-                              status: 'Pending',
-                              tutorName: 'Maria Santos',
-                              tutorImage:
-                                  'https://picsum.photos/200/200?random=17',
-                              platform: 'Zoom',
-                              dateTime: 'Oct 16, 6:00 PM',
-                              duration: '90 minutes',
-                              description:
-                                  'Normalization, indexing, query optimization, and database architecture.',
-                            ),
-                        child: SessionCard(
-                          title: 'Database Design Principles',
-                          status: 'Pending',
-                          statusColor: Colors.orange,
-                          dateTime: 'Oct 16, 6:00 PM',
-                          duration: '90 minutes',
-                          tutorName: 'Maria Santos',
-                          tutorImage: 'https://picsum.photos/200/200?random=17',
-                          platform: 'Zoom',
-                          description:
-                              'Normalization, indexing, query optimization, and database architecture.',
-                          participants: [
-                            'https://picsum.photos/200/200?random=8',
-                          ],
-                          showActions: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            child: Consumer<SessionProvider>(
+              builder: (context, sessionProvider, _) {
+                if (sessionProvider.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (sessionProvider.error != null) {
+                  return Center(child: Text('Error: ${sessionProvider.error}'));
+                }
+
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Upcoming Tab
+                    _buildSessionList(sessionProvider.upcomingSessions),
+                    // Past Tab
+                    _buildSessionList(sessionProvider.pastSessions),
+                    // Requests Tab
+                    _buildSessionList(sessionProvider.pendingSessions),
+                  ],
+                );
+              },
             ),
           ),
         ],
       ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: _navigateToApplyForSession,
+            heroTag: "apply_session",
+            label: const Text('Apply for Session'),
+            icon: const Icon(Icons.person_add),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.extended(
+            onPressed: _navigateToOrganizeSession,
+            heroTag: "organize_session",
+            label: const Text('Organize Session'),
+            icon: const Icon(Icons.add_circle),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        ],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

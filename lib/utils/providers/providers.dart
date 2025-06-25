@@ -300,7 +300,7 @@ class LeaderboardProvider extends ChangeNotifier {
       DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5);
 }
 
-// 5. Session Provider
+// Enhanced Session Provider
 class SessionProvider extends ChangeNotifier {
   final SessionRepository _repository;
 
@@ -311,6 +311,7 @@ class SessionProvider extends ChangeNotifier {
   List<Session>? _upcomingSessions;
   List<Session>? _pastSessions;
   List<Session>? _pendingSessions;
+  List<Session>? _availableSessions;
   Session? _selectedSession;
   DateTime? _lastFetched;
 
@@ -319,6 +320,7 @@ class SessionProvider extends ChangeNotifier {
   List<Session>? get upcomingSessions => _upcomingSessions;
   List<Session>? get pastSessions => _pastSessions;
   List<Session>? get pendingSessions => _pendingSessions;
+  List<Session>? get availableSessions => _availableSessions;
   Session? get selectedSession => _selectedSession;
 
   void clearError() {
@@ -328,6 +330,7 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  // Existing methods
   Future<void> loadUpcomingSessions(
     String userId, {
     bool forceRefresh = false,
@@ -446,10 +449,8 @@ class SessionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // First update the session in Firestore via the repository
       await _repository.rescheduleSession(userId, sessionId, newStartTime);
 
-      // Then update the local state
       if (_upcomingSessions != null) {
         _upcomingSessions =
             _upcomingSessions?.map((session) {
@@ -482,6 +483,270 @@ class SessionProvider extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+  }
+
+  Future<void> submitFeedback(
+    String userId,
+    String sessionId,
+    int rating,
+    String review,
+  ) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repository.submitFeedback(userId, sessionId, rating, review);
+
+      // Move session from upcoming to past sessions
+      if (_upcomingSessions != null) {
+        final sessionIndex = _upcomingSessions!.indexWhere(
+          (s) => s.id == sessionId,
+        );
+        if (sessionIndex != -1) {
+          final session = _upcomingSessions![sessionIndex];
+          _upcomingSessions!.removeAt(sessionIndex);
+
+          // Add to past sessions if loaded
+          // if (_pastSessions != null) {
+          //   _pastSessions!.add(session.copyWith(
+          //     rating: rating,
+          //     review: review,
+          //     status: 'completed',
+          //   ));
+          // }
+        }
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // NEW METHODS
+
+  Future<Session> applyForSession({
+    required String userId,
+    required String title,
+    required String subject,
+    required String level,
+    required String description,
+    required DateTime preferredDateTime,
+    required Duration duration,
+    required String platform,
+    String? notes,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _repository.applyForSession(
+        userId: userId,
+        title: title,
+        subject: subject,
+        level: level,
+        description: description,
+        preferredDateTime: preferredDateTime,
+        duration: duration,
+        platform: platform,
+        notes: notes,
+      );
+
+      // Add to pending sessions if loaded
+      if (_pendingSessions != null) {
+        _pendingSessions!.add(response.data!);
+      }
+
+      _isLoading = false;
+      notifyListeners();
+
+      return response.data!;
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<Session> organizeSession({
+    required String userId,
+    required String title,
+    required String subject,
+    required String level,
+    required String description,
+    required DateTime scheduledDateTime,
+    required Duration duration,
+    required String platform,
+    required int maxParticipants,
+    bool isRecurring = false,
+    String? recurringPattern,
+    bool isPaid = false,
+    double price = 0.0,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _repository.organizeSession(
+        userId: userId,
+        title: title,
+        subject: subject,
+        level: level,
+        description: description,
+        scheduledDateTime: scheduledDateTime,
+        duration: duration,
+        platform: platform,
+        maxParticipants: maxParticipants,
+        isRecurring: isRecurring,
+        recurringPattern: recurringPattern,
+        isPaid: isPaid,
+        price: price,
+      );
+
+      // Add to upcoming sessions if loaded
+      if (_upcomingSessions != null) {
+        _upcomingSessions!.add(response.data!);
+      }
+
+      _isLoading = false;
+      notifyListeners();
+
+      return response.data!;
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> loadAvailableSessions({
+    String? subject,
+    String? level,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _availableSessions != null && _isCacheValid) return;
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _repository.getAvailableSessions(
+        subject: subject,
+        level: level,
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      _availableSessions = response.data;
+      _lastFetched = DateTime.now();
+      _isLoading = false;
+      notifyListeners();
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> joinSession(String userId, String sessionId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repository.joinSession(userId, sessionId);
+
+      // Update available sessions to reflect the change
+      // if (_availableSessions != null) {
+      //   final sessionIndex = _availableSessions!.indexWhere((s) => s.id == sessionId);
+      //   if (sessionIndex != -1) {
+      //     final session = _availableSessions![sessionIndex];
+      //     _availableSessions![sessionIndex] = session.copyWith(
+      //       currentParticipants: (session.currentParticipants ?? 0) + 1,
+      //     );
+      //   }
+      // }
+
+      // Add to upcoming sessions if loaded
+      if (_upcomingSessions != null && _availableSessions != null) {
+        final session = _availableSessions!.firstWhere(
+          (s) => s.id == sessionId,
+        );
+        _upcomingSessions!.add(session);
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> leaveSession(String userId, String sessionId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repository.leaveSession(userId, sessionId);
+
+      // Update available sessions to reflect the change
+      // if (_availableSessions != null) {
+      //   final sessionIndex = _availableSessions!.indexWhere((s) => s.id == sessionId);
+      //   if (sessionIndex != -1) {
+      //     final session = _availableSessions![sessionIndex];
+      //     _availableSessions![sessionIndex] = session.copyWith(
+      //       currentParticipants: (session.currentParticipants ?? 1) - 1,
+      //     );
+      //   }
+      // }
+
+      // Remove from upcoming sessions if loaded
+      if (_upcomingSessions != null) {
+        _upcomingSessions!.removeWhere((session) => session.id == sessionId);
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Utility methods
+  void clearSelectedSession() {
+    _selectedSession = null;
+    notifyListeners();
+  }
+
+  void clearAvailableSessions() {
+    _availableSessions = null;
+    notifyListeners();
+  }
+
+  void refreshAllSessions(String userId) {
+    loadUpcomingSessions(userId, forceRefresh: true);
+    loadPastSessions(userId, forceRefresh: true);
+    loadPendingSessions(userId, forceRefresh: true);
   }
 
   bool get _isCacheValid =>

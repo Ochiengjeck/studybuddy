@@ -747,20 +747,20 @@ class _TutorBookingScreenState extends State<TutorBookingScreen>
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder:
-              (context) => BookingDetailsScreen(
-                sessionTitle: _selectedSubject!,
-                tutorName: widget.tutorName,
-                tutorImage: widget.tutorImage,
-                platform: _selectedPlatform,
-                dateTime:
-                    '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year} at $_selectedTime',
-                duration: _selectedDuration,
-                description:
-                    _sessionDescription.isEmpty
-                        ? 'No specific description provided'
-                        : _sessionDescription,
-              ),
+          builder: (context) => Container(),
+          // BookingDetailsScreen(
+          //   sessionTitle: _selectedSubject!,
+          //   tutorName: widget.tutorName,
+          //   tutorImage: widget.tutorImage,
+          //   platform: _selectedPlatform,
+          //   dateTime:
+          //       '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year} at $_selectedTime',
+          //   duration: _selectedDuration,
+          //   description:
+          //       _sessionDescription.isEmpty
+          //           ? 'No specific description provided'
+          //           : _sessionDescription,
+          // ),
         ),
       );
 

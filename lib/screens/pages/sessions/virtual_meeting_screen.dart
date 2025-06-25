@@ -1,24 +1,11 @@
 import 'package:flutter/material.dart';
 
-class VirtualMeetingScreen extends StatefulWidget {
-  final String sessionTitle;
-  final String tutorName;
-  final String tutorImage;
-  final String platform;
-  final String dateTime;
-  final String duration;
-  final String description;
+import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
 
-  const VirtualMeetingScreen({
-    super.key,
-    required this.sessionTitle,
-    required this.tutorName,
-    required this.tutorImage,
-    required this.platform,
-    required this.dateTime,
-    required this.duration,
-    required this.description,
-  });
+class VirtualMeetingScreen extends StatefulWidget {
+  final Session session;
+
+  const VirtualMeetingScreen({super.key, required this.session});
 
   @override
   State<VirtualMeetingScreen> createState() => _VirtualMeetingScreenState();
@@ -32,7 +19,7 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.sessionTitle),
+        title: Text(widget.session.title),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 1,
       ),
@@ -56,7 +43,7 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
                   children: [
                     CircleAvatar(
                       radius: 24,
-                      backgroundImage: NetworkImage(widget.tutorImage),
+                      backgroundImage: NetworkImage(widget.session.tutorImage),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -64,12 +51,12 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.tutorName,
+                            widget.session.tutorName,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            '${widget.dateTime} • ${widget.duration}',
+                            '${widget.session.formattedDateTime} • ${widget.session.formattedDuration}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -111,7 +98,7 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  widget.description,
+                  widget.session.description,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
@@ -140,7 +127,7 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Connecting to ${widget.platform}...',
+                          'Connecting to ${widget.session.platform}...',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 16,

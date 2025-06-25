@@ -1,24 +1,11 @@
 import 'package:flutter/material.dart';
 
-class SessionDetailsScreen extends StatelessWidget {
-  final String sessionTitle;
-  final String tutorName;
-  final String tutorImage;
-  final String platform;
-  final String dateTime;
-  final String duration;
-  final String description;
+import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
 
-  const SessionDetailsScreen({
-    super.key,
-    required this.sessionTitle,
-    required this.tutorName,
-    required this.tutorImage,
-    required this.platform,
-    required this.dateTime,
-    required this.duration,
-    required this.description,
-  });
+class SessionDetailsScreen extends StatelessWidget {
+  final Session session;
+
+  const SessionDetailsScreen({super.key, required this.session});
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +103,7 @@ class SessionDetailsScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Completed on $dateTime',
+                              'Completed on ${session.formattedDateTime}',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -129,7 +116,7 @@ class SessionDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    sessionTitle,
+                    session.title,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -137,7 +124,7 @@ class SessionDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    description,
+                    session.description,
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey[700],
@@ -173,7 +160,7 @@ class SessionDetailsScreen extends StatelessWidget {
                       _buildInfoRow(
                         Icons.access_time,
                         'Duration',
-                        duration,
+                        session.formattedDuration,
                         Colors.blue,
                       ),
                       const SizedBox(height: 16),
@@ -181,7 +168,7 @@ class SessionDetailsScreen extends StatelessWidget {
                       _buildInfoRow(
                         Icons.videocam,
                         'Platform',
-                        platform,
+                        session.platform,
                         Colors.purple,
                       ),
                       const SizedBox(height: 16),
@@ -189,7 +176,7 @@ class SessionDetailsScreen extends StatelessWidget {
                       _buildInfoRow(
                         Icons.calendar_today,
                         'Date & Time',
-                        dateTime,
+                        session.formattedDateTime,
                         Colors.orange,
                       ),
                     ],
@@ -223,10 +210,10 @@ class SessionDetailsScreen extends StatelessWidget {
                       Row(
                         children: [
                           Hero(
-                            tag: 'tutor_$tutorName',
+                            tag: 'tutor_${session.tutorName}',
                             child: CircleAvatar(
                               radius: 35,
-                              backgroundImage: NetworkImage(tutorImage),
+                              backgroundImage: NetworkImage(session.tutorImage),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -235,7 +222,7 @@ class SessionDetailsScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  tutorName,
+                                  session.tutorName,
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -434,9 +421,9 @@ class SessionDetailsScreen extends StatelessWidget {
                             }),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            '5.0',
-                            style: TextStyle(
+                          Text(
+                            '${session.rating?.toStringAsFixed(1) ?? '5.0'}',
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -627,7 +614,7 @@ class SessionDetailsScreen extends StatelessWidget {
   }
 
   void _showFeedbackDialog(BuildContext context) {
-    int rating = 5;
+    int rating = session.rating?.round() ?? 5;
     final TextEditingController reviewController = TextEditingController(
       text:
           'Excellent session! The tutor explained complex concepts clearly and provided helpful examples. The interactive approach made learning enjoyable and effective.',
@@ -697,6 +684,7 @@ class SessionDetailsScreen extends StatelessWidget {
                     ),
                     ElevatedButton(
                       onPressed: () {
+                        // TODO: Save feedback to backend
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -883,7 +871,7 @@ class SessionDetailsScreen extends StatelessWidget {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Book Another Session with $tutorName'),
+            title: Text('Book Another Session with ${session.tutorName}'),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),

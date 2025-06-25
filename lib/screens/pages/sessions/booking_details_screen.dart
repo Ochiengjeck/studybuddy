@@ -1,27 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../../../utils/providers/providers.dart';
 
 class BookingDetailsScreen extends StatelessWidget {
-  final String sessionTitle;
-  final String tutorName;
-  final String tutorImage;
-  final String platform;
-  final String dateTime;
-  final String duration;
-  final String description;
+  final Session session;
 
-  const BookingDetailsScreen({
-    super.key,
-    required this.sessionTitle,
-    required this.tutorName,
-    required this.tutorImage,
-    required this.platform,
-    required this.dateTime,
-    required this.duration,
-    required this.description,
-  });
+  const BookingDetailsScreen({super.key, required this.session});
 
   @override
   Widget build(BuildContext context) {
+    final sessionProvider = Provider.of<SessionProvider>(
+      context,
+      listen: false,
+    );
+    final userId =
+        Provider.of<AppProvider>(context, listen: false).currentUser?.id ?? '';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Booking Details'),
@@ -109,7 +105,7 @@ class BookingDetailsScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     Text(
-                      sessionTitle,
+                      session.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -117,7 +113,7 @@ class BookingDetailsScreen extends StatelessWidget {
                     const SizedBox(height: 8),
 
                     Text(
-                      description,
+                      session.description,
                       style: Theme.of(
                         context,
                       ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
@@ -125,9 +121,21 @@ class BookingDetailsScreen extends StatelessWidget {
 
                     const SizedBox(height: 16),
 
-                    _buildDetailRow(Icons.schedule, 'Date & Time', dateTime),
-                    _buildDetailRow(Icons.timer, 'Duration', duration),
-                    _buildDetailRow(Icons.video_call, 'Platform', platform),
+                    _buildDetailRow(
+                      Icons.schedule,
+                      'Date & Time',
+                      session.formattedDateTime,
+                    ),
+                    _buildDetailRow(
+                      Icons.timer,
+                      'Duration',
+                      session.formattedDuration,
+                    ),
+                    _buildDetailRow(
+                      Icons.video_call,
+                      'Platform',
+                      session.platform,
+                    ),
                   ],
                 ),
               ),
@@ -155,7 +163,7 @@ class BookingDetailsScreen extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 30,
-                          backgroundImage: NetworkImage(tutorImage),
+                          backgroundImage: NetworkImage(session.tutorImage),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -163,7 +171,7 @@ class BookingDetailsScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                tutorName,
+                                session.tutorName,
                                 style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),
@@ -274,14 +282,33 @@ class BookingDetailsScreen extends StatelessWidget {
                                   child: const Text('Keep Booking'),
                                 ),
                                 TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context); // Close dialog
-                                    Navigator.pop(context); // Go back
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Booking cancelled'),
-                                      ),
-                                    );
+                                  onPressed: () async {
+                                    try {
+                                      await sessionProvider.cancelSession(
+                                        userId,
+                                        session.id,
+                                      );
+                                      Navigator.pop(context); // Close dialog
+                                      Navigator.pop(context); // Go back
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Booking cancelled'),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      Navigator.pop(context); // Close dialog
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Error cancelling booking: ${e.toString()}',
+                                          ),
+                                        ),
+                                      );
+                                    }
                                   },
                                   style: TextButton.styleFrom(
                                     foregroundColor: Colors.red,

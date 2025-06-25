@@ -691,7 +691,7 @@ class Tutor {
 
   factory Tutor.fromJson(Map<String, dynamic> json) => Tutor(
     id: json['id']?.toString() ?? '',
-    userId: json['user_id']?.toString() ?? '',
+    userId: json['userId']?.toString() ?? '',
     name: json['name'] ?? '',
     bio: json['bio'],
     education: json['education'],
@@ -735,7 +735,7 @@ class Tutor {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'user_id': userId,
+    'userId': userId,
     'name': name,
     'bio': bio,
     'education': education,
@@ -786,7 +786,7 @@ class TutorApplication {
   factory TutorApplication.fromJson(Map<String, dynamic> json) =>
       TutorApplication(
         id: json['id']?.toString() ?? '',
-        userId: json['user_id']?.toString() ?? '',
+        userId: json['userId']?.toString() ?? '',
         status: json['status'] ?? 'pending',
         personalInfo: Map<String, dynamic>.from(json['personal_info'] ?? {}),
         subjects: List<String>.from(json['subjects'] ?? []),
@@ -822,7 +822,7 @@ class TutorApplication {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'user_id': userId,
+    'userId': userId,
     'status': status,
     'personal_info': personalInfo,
     'subjects': subjects,
@@ -1489,7 +1489,7 @@ class SessionRepository {
       final snapshot =
           await FirebaseConfig.firestore
               .collection('sessions')
-              .where('user_id', isEqualTo: userId)
+              .where('userId', isEqualTo: userId)
               .where('status', isEqualTo: 'upcoming')
               .get();
 
@@ -1513,7 +1513,7 @@ class SessionRepository {
       final snapshot =
           await FirebaseConfig.firestore
               .collection('sessions')
-              .where('user_id', isEqualTo: userId)
+              .where('userId', isEqualTo: userId)
               .where('status', isEqualTo: 'completed')
               .get();
 
@@ -1537,7 +1537,7 @@ class SessionRepository {
       final snapshot =
           await FirebaseConfig.firestore
               .collection('sessions')
-              .where('user_id', isEqualTo: userId)
+              .where('userId', isEqualTo: userId)
               .where('status', isEqualTo: 'pending')
               .get();
 
@@ -1640,6 +1640,259 @@ class SessionRepository {
       throw ApiError.fromFirebaseException(e);
     }
   }
+
+  // NEW METHOD: Apply for a session
+  Future<ApiResponse<Session>> applyForSession({
+    required String userId,
+    required String title,
+    required String subject,
+    required String level,
+    required String description,
+    required DateTime preferredDateTime,
+    required Duration duration,
+    required String platform,
+    String? notes,
+  }) async {
+    try {
+      final applicationData = {
+        'userId': userId,
+        'title': title,
+        'subject': subject,
+        'level': level,
+        'description': description,
+        'start_time': Timestamp.fromDate(preferredDateTime),
+        'duration_minutes': duration.inMinutes,
+        'platform': platform,
+        'status': 'pending',
+        'type': 'application', // To distinguish from organized sessions
+        'notes': notes ?? '',
+        'tutor_name': 'To be assigned',
+        'tutor_image': '',
+        'participant_images': [],
+        'is_current_user': true,
+        'created_at': Timestamp.now(),
+        'updated_at': Timestamp.now(),
+      };
+
+      final docRef = await FirebaseConfig.firestore
+          .collection('sessions')
+          .add(applicationData);
+
+      final session = Session.fromJson({...applicationData, 'id': docRef.id});
+
+      return ApiResponse<Session>(
+        success: true,
+        message: 'Session application submitted successfully',
+        data: session,
+      );
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  // NEW METHOD: Organize a session
+  Future<ApiResponse<Session>> organizeSession({
+    required String userId,
+    required String title,
+    required String subject,
+    required String level,
+    required String description,
+    required DateTime scheduledDateTime,
+    required Duration duration,
+    required String platform,
+    required int maxParticipants,
+    bool isRecurring = false,
+    String? recurringPattern,
+    bool isPaid = false,
+    double price = 0.0,
+  }) async {
+    try {
+      final sessionData = {
+        'organizer_id': userId,
+        'userId': userId, // For compatibility with existing queries
+        'title': title,
+        'subject': subject,
+        'level': level,
+        'description': description,
+        'start_time': Timestamp.fromDate(scheduledDateTime),
+        'duration_minutes': duration.inMinutes,
+        'platform': platform,
+        'status': 'upcoming',
+        'type': 'organized', // To distinguish from applications
+        'max_participants': maxParticipants,
+        'current_participants': 0,
+        'is_recurring': isRecurring,
+        'recurring_pattern': recurringPattern,
+        'is_paid': isPaid,
+        'price': price,
+        'tutor_name': 'You', // Since the user is organizing it
+        'tutor_image': '',
+        'participant_images': [],
+        'participants': [], // List of participant user IDs
+        'is_current_user': true,
+        'created_at': Timestamp.now(),
+        'updated_at': Timestamp.now(),
+      };
+
+      final docRef = await FirebaseConfig.firestore
+          .collection('sessions')
+          .add(sessionData);
+
+      final session = Session.fromJson({...sessionData, 'id': docRef.id});
+
+      return ApiResponse<Session>(
+        success: true,
+        message: 'Session organized successfully',
+        data: session,
+      );
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  // NEW METHOD: Get available sessions to join
+  Future<ApiResponse<List<Session>>> getAvailableSessions({
+    String? subject,
+    String? level,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      var query = FirebaseConfig.firestore
+          .collection('sessions')
+          .where('status', isEqualTo: 'upcoming')
+          .where('type', isEqualTo: 'organized')
+          .where('current_participants', isLessThan: 'max_participants');
+
+      if (subject != null && subject.isNotEmpty) {
+        query = query.where('subject', isEqualTo: subject);
+      }
+
+      if (level != null && level.isNotEmpty) {
+        query = query.where('level', isEqualTo: level);
+      }
+
+      if (startDate != null) {
+        query = query.where(
+          'start_time',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+        );
+      }
+
+      if (endDate != null) {
+        query = query.where(
+          'start_time',
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+        );
+      }
+
+      final snapshot = await query.get();
+
+      final sessions =
+          snapshot.docs
+              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+
+      return ApiResponse<List<Session>>(
+        success: true,
+        message: 'Available sessions retrieved',
+        data: sessions,
+      );
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  // NEW METHOD: Join a session
+  Future<ApiResponse<void>> joinSession(String userId, String sessionId) async {
+    try {
+      final sessionRef = FirebaseConfig.firestore
+          .collection('sessions')
+          .doc(sessionId);
+
+      await FirebaseConfig.firestore.runTransaction((transaction) async {
+        final sessionDoc = await transaction.get(sessionRef);
+
+        if (!sessionDoc.exists) {
+          throw ApiError(message: 'Session not found');
+        }
+
+        final sessionData = sessionDoc.data()!;
+        final currentParticipants = sessionData['current_participants'] ?? 0;
+        final maxParticipants = sessionData['max_participants'] ?? 0;
+        final participants = List<String>.from(
+          sessionData['participants'] ?? [],
+        );
+
+        if (currentParticipants >= maxParticipants) {
+          throw ApiError(message: 'Session is full');
+        }
+
+        if (participants.contains(userId)) {
+          throw ApiError(message: 'Already joined this session');
+        }
+
+        participants.add(userId);
+
+        transaction.update(sessionRef, {
+          'participants': participants,
+          'current_participants': participants.length,
+          'updated_at': Timestamp.now(),
+        });
+      });
+
+      return ApiResponse<void>(
+        success: true,
+        message: 'Successfully joined the session',
+      );
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  // NEW METHOD: Leave a session
+  Future<ApiResponse<void>> leaveSession(
+    String userId,
+    String sessionId,
+  ) async {
+    try {
+      final sessionRef = FirebaseConfig.firestore
+          .collection('sessions')
+          .doc(sessionId);
+
+      await FirebaseConfig.firestore.runTransaction((transaction) async {
+        final sessionDoc = await transaction.get(sessionRef);
+
+        if (!sessionDoc.exists) {
+          throw ApiError(message: 'Session not found');
+        }
+
+        final sessionData = sessionDoc.data()!;
+        final participants = List<String>.from(
+          sessionData['participants'] ?? [],
+        );
+
+        if (!participants.contains(userId)) {
+          throw ApiError(message: 'Not a participant of this session');
+        }
+
+        participants.remove(userId);
+
+        transaction.update(sessionRef, {
+          'participants': participants,
+          'current_participants': participants.length,
+          'updated_at': Timestamp.now(),
+        });
+      });
+
+      return ApiResponse<void>(
+        success: true,
+        message: 'Successfully left the session',
+      );
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
 }
 
 class HomeRepository {
@@ -1719,7 +1972,7 @@ class HomeRepository {
       final snapshot =
           await FirebaseConfig.firestore
               .collection('sessions')
-              .where('user_id', isEqualTo: userId)
+              .where('userId', isEqualTo: userId)
               .where('status', isEqualTo: 'upcoming')
               .limit(5)
               .get();
@@ -1809,7 +2062,7 @@ class TutorRepository {
   }) async {
     try {
       final applicationData = {
-        'user_id': userId,
+        'userId': userId,
         'status': 'pending',
         'personal_info': personalInfo,
         'subjects': subjects,
@@ -1840,7 +2093,7 @@ class TutorRepository {
       final snapshot =
           await FirebaseConfig.firestore
               .collection('tutor_applications')
-              .where('user_id', isEqualTo: userId)
+              .where('userId', isEqualTo: userId)
               .get();
 
       final applications =
@@ -1872,7 +2125,7 @@ class TutorRepository {
   }) async {
     try {
       final sessionData = {
-        'user_id': userId,
+        'userId': userId,
         'tutor_id': tutorId,
         'subject': subject,
         'start_time': Timestamp.fromDate(dateTime),
@@ -1902,7 +2155,7 @@ class TutorRepository {
   }) async {
     try {
       final requestData = {
-        'user_id': userId,
+        'userId': userId,
         'subject': subject,
         'details': details,
         'priority': priority,
