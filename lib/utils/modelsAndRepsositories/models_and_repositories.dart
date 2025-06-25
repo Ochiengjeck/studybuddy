@@ -1526,14 +1526,19 @@ class HomeRepository {
   HomeRepository(this.client);
 
   Future<ApiResponse<UserStats>> getUserStats(String token) async {
+    debugPrint('Getting user stats...');
     try {
       final response = await client.get(
         Uri.parse('${ApiConfig.baseUrl}/achievements/stats/'),
         headers: ApiConfig.authHeaders(token),
       );
+      debugPrint(
+        'User stats response: ${response.statusCode} - ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
+        debugPrint('User stats data: $json');
         return ApiResponse<UserStats>.fromJson(
           json,
           (data) => UserStats.fromJson(data),
@@ -1542,6 +1547,7 @@ class HomeRepository {
         throw ApiError.fromResponse(response);
       }
     } catch (e) {
+      debugPrint('Error fetching user stats: $e');
       throw ApiError(message: e.toString());
     }
   }

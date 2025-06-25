@@ -532,14 +532,13 @@ class HomeProvider extends ChangeNotifier {
       _recentActivities = activitiesResponse.data;
       _upcomingSessionsPreview = sessionsResponse.data;
       _lastFetched = DateTime.now();
-
-      _isLoading = false;
-      notifyListeners();
+      _error = null;
     } on ApiError catch (e) {
-      _isLoading = false;
       _error = e.message;
+      debugPrint('Error loading home data: ${e.message}');
+    } finally {
+      _isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 }
