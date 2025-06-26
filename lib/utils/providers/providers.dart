@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -1045,95 +1046,125 @@ class TutorProvider extends ChangeNotifier {
 }
 
 // 8. Chat Provider
-class ChatProvider extends ChangeNotifier {
-  final ChatRepository _repository;
 
-  ChatProvider(this._repository);
+class ChatProvider with ChangeNotifier {
+  final ChatRepository _chatRepository = ChatRepository();
 
-  bool _isLoading = false;
-  String? _error;
-  List<Chat>? _chats;
-  List<Message>? _messages;
-  String? _selectedChatId;
-  DateTime? _lastFetched;
+  List<Chat> _chats = [];
+  List<Message> _messages = [];
 
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-  List<Chat>? get chats => _chats;
-  List<Message>? get messages => _messages;
-  String? get selectedChatId => _selectedChatId;
+  List<Chat> get chats => _chats;
+  List<Message> get messages => _messages;
 
-  void clearError() {
-    if (_error != null) {
-      _error = null;
-      notifyListeners();
-    }
-  }
-
-  Future<void> loadChats(String userId, {bool forceRefresh = false}) async {
-    if (!forceRefresh && _chats != null && _isCacheValid) return;
-
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
+  Future<void> loadChats(String userId) async {
     try {
-      final response = await _repository.getChats(userId);
-      _chats = response.data;
-      _lastFetched = DateTime.now();
-      _isLoading = false;
+      _chats = await _chatRepository.getChats(userId);
       notifyListeners();
-    } on ApiError catch (e) {
-      _isLoading = false;
-      _error = e.message;
-      notifyListeners();
-      rethrow;
+    } catch (e) {
+      print('Error loading chats: $e');
     }
   }
 
   Future<void> loadMessages(String chatId) async {
-    _isLoading = true;
-    _error = null;
-    _selectedChatId = chatId;
-    notifyListeners();
-
     try {
-      final response = await _repository.getMessages(chatId);
-      _messages = response.data;
-      _isLoading = false;
+      _messages = await _chatRepository.getMessages(chatId);
       notifyListeners();
-    } on ApiError catch (e) {
-      _isLoading = false;
-      _error = e.message;
-      notifyListeners();
-      rethrow;
+    } catch (e) {
+      print('Error loading messages: $e');
     }
   }
 
   Future<void> sendMessage(Message message) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
     try {
-      final response = await _repository.sendMessage(message);
-      if (response.data != null) {
-        _messages ??= [];
-        _messages!.add(response.data!);
-      }
-      _isLoading = false;
+      await _chatRepository.sendMessage(message);
       notifyListeners();
-    } on ApiError catch (e) {
-      _isLoading = false;
-      _error = e.message;
-      notifyListeners();
+    } catch (e) {
+      print('Error sending message: $e');
       rethrow;
     }
   }
 
-  bool get _isCacheValid =>
-      _lastFetched != null &&
-      DateTime.now().difference(_lastFetched!) < const Duration(minutes: 1);
+  Future<String> createChat(
+    String currentUserId,
+    String currentUserName,
+    String otherUserId,
+    String otherUserName,
+  ) async {
+    try {
+      // Generate a unique chat ID
+      final chatId = FirebaseConfig.firestore.collection('chats').doc().id;
+
+      // Fetch user details for profile pictures
+      final currentUserDoc =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(currentUserId)
+              .get();
+      final currentUserData = currentUserDoc.data();
+      final currentUserProfilePicture = currentUserData?['profile_picture'];
+
+      final otherUserDoc =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(otherUserId)
+              .get();
+      final otherUserData = otherUserDoc.data();
+      final otherUserProfilePicture = otherUserData?['profile_picture'];
+
+      // Create chat document in the main chats collection
+      final chatData = {
+        'members': [currentUserId, otherUserId],
+        'last_message': '',
+        'last_message_time': FieldValue.serverTimestamp(),
+        'created_at': FieldValue.serverTimestamp(),
+      };
+      await FirebaseConfig.firestore
+          .collection('chats')
+          .doc(chatId)
+          .set(chatData);
+
+      // Create chat reference for current user
+      final currentUserChat = Chat(
+        id: chatId,
+        name: otherUserName,
+        imageUrl: otherUserProfilePicture,
+        lastMessage: '',
+        lastMessageTime: DateTime.now(),
+        unreadCount: 0,
+      );
+      await FirebaseConfig.firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('chats')
+          .doc(chatId)
+          .set(currentUserChat.toJson());
+
+      // Create_epoch chat reference for other user
+      final otherUserChat = Chat(
+        id: chatId,
+        name: currentUserName,
+        imageUrl: currentUserProfilePicture,
+        lastMessage: '',
+        lastMessageTime: DateTime.now(),
+        unreadCount: 0,
+      );
+      await FirebaseConfig.firestore
+          .collection('users')
+          .doc(otherUserId)
+          .collection('chats')
+          .doc(chatId)
+          .set(otherUserChat.toJson());
+
+      // Add the new chat to the local list
+      _chats.add(currentUserChat);
+      notifyListeners();
+
+      return chatId;
+    } catch (e) {
+      print('Error creating chat: $e');
+      rethrow;
+    }
+  }
 }
 
 // 9. Analytics Provider
@@ -1415,7 +1446,7 @@ List<SingleChildWidget> getProviders() {
     ),
     Provider<ChatRepository>(create: (_) => ChatRepository()),
     ChangeNotifierProxyProvider<AppProvider, ChatProvider>(
-      create: (_) => ChatProvider(ChatRepository()),
+      create: (_) => ChatProvider(),
       update: (_, appProvider, provider) => provider!,
     ),
     Provider<AnalyticsRepository>(create: (_) => AnalyticsRepository()),

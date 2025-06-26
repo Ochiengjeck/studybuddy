@@ -51,7 +51,7 @@ class _CustomDrawerState extends State<CustomDrawer>
 
       if (appProvider.currentUser != null) {
         homeProvider.loadHomeData(appProvider.currentUser!.id);
-        chatProvider.loadChats(appProvider.currentUser!.id);
+        chatProvider.loadMessages(appProvider.currentUser!.id);
         sessionProvider.loadPendingSessions(appProvider.currentUser!.id);
       }
     });

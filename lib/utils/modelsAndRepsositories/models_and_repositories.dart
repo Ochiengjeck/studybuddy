@@ -2,7 +2,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter/material.dart';
-import 'dart:convert';
 
 // =============================================
 // 2. Configurations
@@ -1212,6 +1211,7 @@ class Message {
   final String id;
   final String chatId;
   final String text;
+  final String senderId;
   final bool isMe;
   final DateTime time;
   final MessageStatus status;
@@ -1220,34 +1220,43 @@ class Message {
     required this.id,
     required this.chatId,
     required this.text,
+    required this.senderId,
     required this.isMe,
     required this.time,
-    this.status = MessageStatus.sent,
+    required this.status,
   });
 
-  factory Message.fromJson(Map<String, dynamic> json) => Message(
-    id: json['id']?.toString() ?? '',
-    chatId: json['chat_id']?.toString() ?? '',
-    text: json['text'] ?? '',
-    isMe: json['is_me'] ?? false,
-    time:
-        json['time'] is Timestamp
-            ? json['time'].toDate()
-            : DateTime.parse(json['time']),
-    status: MessageStatus.values.firstWhere(
-      (e) => e.toString() == 'MessageStatus.${json['status']}',
-      orElse: () => MessageStatus.sent,
-    ),
-  );
+  factory Message.fromJson(Map<String, dynamic> json) {
+    return Message(
+      id: json['id'] ?? '',
+      chatId: json['chatId'] ?? '',
+      text: json['text'] ?? '',
+      senderId: json['senderId'] ?? '',
+      isMe: json['isMe'] ?? false,
+      time:
+          json['time'] is Timestamp
+              ? json['time'].toDate()
+              : DateTime.parse(
+                json['time'] ?? DateTime.now().toIso8601String(),
+              ),
+      status: MessageStatus.values.firstWhere(
+        (e) => e.toString() == 'MessageStatus.${json['status']}',
+        orElse: () => MessageStatus.sent,
+      ),
+    );
+  }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'chat_id': chatId,
-    'text': text,
-    'is_me': isMe,
-    'time': time,
-    'status': status.toString().split('.').last,
-  };
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'chatId': chatId,
+      'text': text,
+      'senderId': senderId,
+      'isMe': isMe,
+      'time': time.toIso8601String(),
+      'status': status.toString().split('.').last,
+    };
+  }
 }
 
 // =============================================
@@ -2829,73 +2838,86 @@ class TutorRepository {
 }
 
 class ChatRepository {
-  Future<ApiResponse<List<Chat>>> getChats(String userId) async {
-    try {
-      final snapshot =
-          await FirebaseConfig.firestore
-              .collection('users')
-              .doc(userId)
-              .collection('chats')
-              .get();
-
-      final chats =
-          snapshot.docs
-              .map((doc) => Chat.fromJson({...doc.data(), 'id': doc.id}))
-              .toList();
-
-      return ApiResponse<List<Chat>>(
-        success: true,
-        message: 'Chats retrieved',
-        data: chats,
-      );
-    } catch (e) {
-      throw ApiError.fromFirebaseException(e);
-    }
+  Future<List<Chat>> getChats(String userId) async {
+    final snapshot =
+        await FirebaseConfig.firestore
+            .collection('users')
+            .doc(userId)
+            .collection('chats')
+            .orderBy('last_message_time', descending: true)
+            .get();
+    return snapshot.docs
+        .map((doc) => Chat.fromJson({...doc.data(), 'id': doc.id}))
+        .toList();
   }
 
-  Future<ApiResponse<List<Message>>> getMessages(String chatId) async {
+  Future<List<Message>> getMessages(String chatId) async {
+    final snapshot =
+        await FirebaseConfig.firestore
+            .collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .orderBy('time', descending: true)
+            .get();
+    return snapshot.docs
+        .map((doc) => Message.fromJson({...doc.data(), 'id': doc.id}))
+        .toList();
+  }
+
+  Future<void> sendMessage(Message message) async {
     try {
-      final snapshot =
-          await FirebaseConfig.firestore
+      // Save the message to the chats collection
+      final messageRef =
+          FirebaseConfig.firestore
               .collection('chats')
-              .doc(chatId)
+              .doc(message.chatId)
               .collection('messages')
-              .orderBy('time')
-              .get();
+              .doc();
+      final messageData = {
+        ...message.toJson(),
+        'id': messageRef.id,
+        'time': FieldValue.serverTimestamp(),
+      };
+      await messageRef.set(messageData);
 
-      final messages =
-          snapshot.docs
-              .map((doc) => Message.fromJson({...doc.data(), 'id': doc.id}))
-              .toList();
+      // Update the chat's last message and timestamp for both users
+      final chatData = {
+        'last_message': message.text,
+        'last_message_time': FieldValue.serverTimestamp(),
+      };
 
-      return ApiResponse<List<Message>>(
-        success: true,
-        message: 'Messages retrieved',
-        data: messages,
-      );
-    } catch (e) {
-      throw ApiError.fromFirebaseException(e);
-    }
-  }
-
-  Future<ApiResponse<Message>> sendMessage(Message message) async {
-    try {
-      final messageData = message.toJson();
-      messageData['time'] = Timestamp.now();
-
-      final ref = await FirebaseConfig.firestore
+      // Update the main chat document
+      await FirebaseConfig.firestore
           .collection('chats')
           .doc(message.chatId)
-          .collection('messages')
-          .add(messageData);
+          .update(chatData);
 
-      return ApiResponse<Message>(
-        success: true,
-        message: 'Message sent successfully',
-        data: Message.fromJson({...messageData, 'id': ref.id}),
-      );
+      // Get the chat members
+      final chatDoc =
+          await FirebaseConfig.firestore
+              .collection('chats')
+              .doc(message.chatId)
+              .get();
+      final members = List<String>.from(chatDoc.data()?['members'] ?? []);
+
+      // Update each user's chat reference
+      for (final userId in members) {
+        final userChatRef = FirebaseConfig.firestore
+            .collection('users')
+            .doc(userId)
+            .collection('chats')
+            .doc(message.chatId);
+        await userChatRef.update({
+          'last_message': message.text,
+          'last_message_time': FieldValue.serverTimestamp(),
+          // Increment unread count for other users (not the sender)
+          if (userId != message.senderId)
+            'unread_count': FieldValue.increment(1),
+        });
+      }
     } catch (e) {
-      throw ApiError.fromFirebaseException(e);
+      print('Error sending message in repository: $e');
+      rethrow;
     }
   }
 }
