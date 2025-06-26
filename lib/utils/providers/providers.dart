@@ -300,6 +300,7 @@ class LeaderboardProvider extends ChangeNotifier {
       DateTime.now().difference(_lastFetched!) < const Duration(minutes: 5);
 }
 
+// 5. Session Provider
 // Enhanced Session Provider
 class SessionProvider extends ChangeNotifier {
   final SessionRepository _repository;
@@ -509,11 +510,13 @@ class SessionProvider extends ChangeNotifier {
 
           // Add to past sessions if loaded
           // if (_pastSessions != null) {
-          //   _pastSessions!.add(session.copyWith(
-          //     rating: rating,
-          //     review: review,
-          //     status: 'completed',
-          //   ));
+          //   _pastSessions!.add(
+          //     session.copyWith(
+          //       rating: rating,
+          //       review: review,
+          //       status: 'completed',
+          //     ),
+          //   );
           // }
         }
       }
@@ -671,7 +674,9 @@ class SessionProvider extends ChangeNotifier {
 
       // Update available sessions to reflect the change
       // if (_availableSessions != null) {
-      //   final sessionIndex = _availableSessions!.indexWhere((s) => s.id == sessionId);
+      //   final sessionIndex = _availableSessions!.indexWhere(
+      //     (s) => s.id == sessionId,
+      //   );
       //   if (sessionIndex != -1) {
       //     final session = _availableSessions![sessionIndex];
       //     _availableSessions![sessionIndex] = session.copyWith(
@@ -707,15 +712,17 @@ class SessionProvider extends ChangeNotifier {
       await _repository.leaveSession(userId, sessionId);
 
       // Update available sessions to reflect the change
-      // if (_availableSessions != null) {
-      //   final sessionIndex = _availableSessions!.indexWhere((s) => s.id == sessionId);
-      //   if (sessionIndex != -1) {
-      //     final session = _availableSessions![sessionIndex];
-      //     _availableSessions![sessionIndex] = session.copyWith(
-      //       currentParticipants: (session.currentParticipants ?? 1) - 1,
-      //     );
-      //   }
-      // }
+      if (_availableSessions != null) {
+        final sessionIndex = _availableSessions!.indexWhere(
+          (s) => s.id == sessionId,
+        );
+        // if (sessionIndex != -1) {
+        //   final session = _availableSessions![sessionIndex];
+        //   _availableSessions![sessionIndex] = session.copyWith(
+        //     currentParticipants: (session.currentParticipants ?? 1) - 1,
+        //   );
+        // }
+      }
 
       // Remove from upcoming sessions if loaded
       if (_upcomingSessions != null) {

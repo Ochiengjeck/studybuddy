@@ -221,7 +221,18 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 10),
                     if (recentActivities.isEmpty)
-                      const Text('No recent activity.')
+                      Center(
+                        child: Image.asset("assets/empty.png", height: 300),
+                      )
+                    else if (recentActivities.length == 1)
+                      _buildActivityItem(
+                        context,
+                        icon: recentActivities[0].icon,
+                        iconColor: recentActivities[0].iconColor,
+                        title: recentActivities[0].title,
+                        subtitle: recentActivities[0].description,
+                        time: recentActivities[0].formattedTime,
+                      )
                     else
                       ...recentActivities.map((activity) {
                         return _buildActivityItem(

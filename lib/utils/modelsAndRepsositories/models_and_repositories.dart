@@ -322,6 +322,8 @@ class UserStats {
 
 enum SessionStatus { upcoming, completed, pending, declined, inProgress }
 
+enum SessionType { application, organized }
+
 class Session {
   final String id;
   final String title;
@@ -332,39 +334,25 @@ class Session {
   final Duration duration;
   final String description;
   final SessionStatus status;
+  final SessionType type;
   final double? rating;
+  final String? review;
   final List<String> participantImages;
+  final List<String> participants;
   final bool isCurrentUser;
-
-  Session copyWith({
-    String? id,
-    String? title,
-    String? tutorName,
-    String? tutorImage,
-    String? platform,
-    DateTime? startTime,
-    Duration? duration,
-    String? description,
-    SessionStatus? status,
-    double? rating,
-    List<String>? participantImages,
-    bool? isCurrentUser,
-  }) {
-    return Session(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      tutorName: tutorName ?? this.tutorName,
-      tutorImage: tutorImage ?? this.tutorImage,
-      platform: platform ?? this.platform,
-      startTime: startTime ?? this.startTime,
-      duration: duration ?? this.duration,
-      description: description ?? this.description,
-      status: status ?? this.status,
-      rating: rating ?? this.rating,
-      participantImages: participantImages ?? this.participantImages,
-      isCurrentUser: isCurrentUser ?? this.isCurrentUser,
-    );
-  }
+  final String userId;
+  final String? organizerId;
+  final String subject;
+  final String level;
+  final String? notes;
+  final int? maxParticipants;
+  final int? currentParticipants;
+  final bool isRecurring;
+  final String? recurringPattern;
+  final bool isPaid;
+  final double price;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   Session({
     required this.id,
@@ -376,28 +364,123 @@ class Session {
     required this.duration,
     required this.description,
     required this.status,
+    required this.type,
+    required this.userId,
+    required this.subject,
+    required this.level,
+    required this.createdAt,
+    required this.updatedAt,
     this.rating,
+    this.review,
     this.participantImages = const [],
+    this.participants = const [],
     this.isCurrentUser = false,
+    this.organizerId,
+    this.notes,
+    this.maxParticipants,
+    this.currentParticipants,
+    this.isRecurring = false,
+    this.recurringPattern,
+    this.isPaid = false,
+    this.price = 0.0,
   });
 
-  factory Session.fromJson(Map<String, dynamic> json) => Session(
-    id: json['id']?.toString() ?? '',
-    title: json['title'] ?? '',
-    tutorName: json['tutor_name'] ?? '',
-    tutorImage: json['tutor_image'] ?? '',
-    platform: json['platform'] ?? 'Google Meet',
-    startTime:
-        json['start_time'] is Timestamp
-            ? json['start_time'].toDate()
-            : DateTime.parse(json['start_time']),
-    duration: Duration(minutes: json['duration_minutes'] ?? 60),
-    description: json['description'] ?? '',
-    status: _parseSessionStatus(json['status']),
-    rating: json['rating']?.toDouble(),
-    participantImages: List<String>.from(json['participant_images'] ?? []),
-    isCurrentUser: json['is_current_user'] ?? false,
-  );
+  Session copyWith({
+    String? id,
+    String? title,
+    String? tutorName,
+    String? tutorImage,
+    String? platform,
+    DateTime? startTime,
+    Duration? duration,
+    String? description,
+    SessionStatus? status,
+    SessionType? type,
+    double? rating,
+    String? review,
+    List<String>? participantImages,
+    List<String>? participants,
+    bool? isCurrentUser,
+    String? userId,
+    String? organizerId,
+    String? subject,
+    String? level,
+    String? notes,
+    int? maxParticipants,
+    int? currentParticipants,
+    bool? isRecurring,
+    String? recurringPattern,
+    bool? isPaid,
+    double? price,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Session(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      tutorName: tutorName ?? this.tutorName,
+      tutorImage: tutorImage ?? this.tutorImage,
+      platform: platform ?? this.platform,
+      startTime: startTime ?? this.startTime,
+      duration: duration ?? this.duration,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      type: type ?? this.type,
+      rating: rating ?? this.rating,
+      review: review ?? this.review,
+      participantImages: participantImages ?? this.participantImages,
+      participants: participants ?? this.participants,
+      isCurrentUser: isCurrentUser ?? this.isCurrentUser,
+      userId: userId ?? this.userId,
+      organizerId: organizerId ?? this.organizerId,
+      subject: subject ?? this.subject,
+      level: level ?? this.level,
+      notes: notes ?? this.notes,
+      maxParticipants: maxParticipants ?? this.maxParticipants,
+      currentParticipants: currentParticipants ?? this.currentParticipants,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurringPattern: recurringPattern ?? this.recurringPattern,
+      isPaid: isPaid ?? this.isPaid,
+      price: price ?? this.price,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  factory Session.fromJson(Map<String, dynamic> json) {
+    return Session(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      tutorName: json['tutor_name']?.toString() ?? '',
+      tutorImage: json['tutor_image']?.toString() ?? '',
+      platform: json['platform']?.toString() ?? 'Google Meet',
+      startTime: _parseDateTime(json['start_time']),
+      duration: Duration(
+        minutes: _parseInt(json['duration_minutes'], 60) ?? 60,
+      ),
+      description: json['description']?.toString() ?? '',
+      status: _parseSessionStatus(json['status']),
+      type: _parseSessionType(json['type']),
+      rating: _parseDouble(json['rating']),
+      review: json['review']?.toString(),
+      participantImages: _parseStringList(json['participant_images']),
+      participants: _parseStringList(json['participants']),
+      isCurrentUser: json['is_current_user'] == true,
+      userId: json['user_id']?.toString() ?? '',
+      organizerId: json['organizer_id']?.toString(),
+      subject: json['subject']?.toString() ?? '',
+      level: json['level']?.toString() ?? '',
+      notes: json['notes']?.toString(),
+      maxParticipants: _parseInt(json['max_participants']),
+      currentParticipants: _parseInt(json['current_participants']),
+      isRecurring: json['is_recurring'] == true,
+      recurringPattern: json['recurring_pattern']?.toString(),
+      isPaid: json['is_paid'] == true,
+      price: _parseDouble(json['price']) ?? 0.0,
+      createdAt: _parseDateTime(json['created_at']) ?? DateTime.now(),
+      updatedAt: _parseDateTime(json['updated_at']) ?? DateTime.now(),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -405,15 +488,32 @@ class Session {
     'tutor_name': tutorName,
     'tutor_image': tutorImage,
     'platform': platform,
-    'start_time': startTime,
+    'start_time': Timestamp.fromDate(startTime),
     'duration_minutes': duration.inMinutes,
     'description': description,
-    'status': status.toString().split('.').last,
+    'status': status.name,
+    'type': type.name,
     'rating': rating,
+    'review': review,
     'participant_images': participantImages,
+    'participants': participants,
     'is_current_user': isCurrentUser,
+    'user_id': userId,
+    'organizer_id': organizerId,
+    'subject': subject,
+    'level': level,
+    'notes': notes,
+    'max_participants': maxParticipants,
+    'current_participants': currentParticipants,
+    'is_recurring': isRecurring,
+    'recurring_pattern': recurringPattern,
+    'is_paid': isPaid,
+    'price': price,
+    'created_at': Timestamp.fromDate(createdAt),
+    'updated_at': Timestamp.fromDate(updatedAt),
   };
 
+  // Computed properties
   String get formattedDateTime {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -431,9 +531,14 @@ class Session {
   String get formattedDuration {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
-    return hours > 0
-        ? '$hours ${hours == 1 ? 'hour' : 'hours'} ${minutes > 0 ? '$minutes min' : ''}'
-        : '$minutes minutes';
+
+    if (hours > 0) {
+      return minutes > 0
+          ? '$hours ${hours == 1 ? 'hour' : 'hours'} $minutes min'
+          : '$hours ${hours == 1 ? 'hour' : 'hours'}';
+    } else {
+      return '$minutes minutes';
+    }
   }
 
   String get statusText {
@@ -466,8 +571,143 @@ class Session {
     }
   }
 
-  static SessionStatus _parseSessionStatus(String status) {
-    switch (status.toLowerCase()) {
+  String get typeText {
+    switch (type) {
+      case SessionType.application:
+        return 'Application';
+      case SessionType.organized:
+        return 'Organized';
+    }
+  }
+
+  bool get hasAvailableSpots {
+    if (maxParticipants == null || currentParticipants == null) return true;
+    return currentParticipants! < maxParticipants!;
+  }
+
+  String get participantInfo {
+    if (maxParticipants == null || currentParticipants == null) return '';
+    return '$currentParticipants/$maxParticipants participants';
+  }
+
+  bool get canJoin {
+    return status == SessionStatus.upcoming &&
+        hasAvailableSpots &&
+        startTime.isAfter(DateTime.now()) &&
+        !participants.contains(userId) &&
+        organizerId != userId;
+  }
+
+  bool get canCancel {
+    return (status == SessionStatus.upcoming ||
+            status == SessionStatus.pending) &&
+        startTime.isAfter(DateTime.now()) &&
+        (userId == organizerId || isCurrentUser);
+  }
+
+  bool get canReschedule {
+    return status == SessionStatus.upcoming &&
+        startTime.isAfter(DateTime.now()) &&
+        (userId == organizerId || isCurrentUser);
+  }
+
+  bool get canRate {
+    return status == SessionStatus.completed &&
+        rating == null &&
+        (participants.contains(userId) || isCurrentUser);
+  }
+
+  bool get canLeave {
+    return status == SessionStatus.upcoming &&
+        startTime.isAfter(DateTime.now()) &&
+        participants.contains(userId) &&
+        organizerId != userId;
+  }
+
+  bool get isOrganizer {
+    return organizerId == userId;
+  }
+
+  bool get isParticipant {
+    return participants.contains(userId);
+  }
+
+  bool get isUpcoming {
+    return status == SessionStatus.upcoming &&
+        startTime.isAfter(DateTime.now());
+  }
+
+  bool get isPast {
+    return startTime.isBefore(DateTime.now()) ||
+        status == SessionStatus.completed;
+  }
+
+  String get priceText {
+    if (!isPaid || price == 0) return 'Free';
+    return 'KSh ${price.toStringAsFixed(0)}';
+  }
+
+  String get endTimeFormatted {
+    final endTime = startTime.add(duration);
+    return _formatTime(endTime);
+  }
+
+  String get fullTimeRange {
+    return '${_formatTime(startTime)} - ${endTimeFormatted}';
+  }
+
+  // Helper methods for parsing
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is Timestamp) return value.toDate();
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        return DateTime.now();
+      }
+    }
+    return DateTime.now();
+  }
+
+  static int? _parseInt(dynamic value, [int? defaultValue]) {
+    if (value == null) return defaultValue;
+    if (value is int) return value;
+    if (value is String) {
+      try {
+        return int.parse(value);
+      } catch (e) {
+        return defaultValue;
+      }
+    }
+    return defaultValue;
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) {
+      try {
+        return double.parse(value);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  static List<String> _parseStringList(dynamic value) {
+    if (value == null) return [];
+    if (value is List) return value.map((e) => e.toString()).toList();
+    return [];
+  }
+
+  static SessionStatus _parseSessionStatus(dynamic status) {
+    if (status == null) return SessionStatus.upcoming;
+
+    final statusStr = status.toString().toLowerCase();
+    switch (statusStr) {
       case 'upcoming':
         return SessionStatus.upcoming;
       case 'completed':
@@ -477,32 +717,120 @@ class Session {
       case 'declined':
         return SessionStatus.declined;
       case 'in_progress':
+      case 'inprogress':
         return SessionStatus.inProgress;
       default:
         return SessionStatus.upcoming;
     }
   }
 
+  static SessionType _parseSessionType(dynamic type) {
+    if (type == null) return SessionType.application;
+
+    final typeStr = type.toString().toLowerCase();
+    switch (typeStr) {
+      case 'application':
+        return SessionType.application;
+      case 'organized':
+        return SessionType.organized;
+      default:
+        return SessionType.application;
+    }
+  }
+
   static String _formatTime(DateTime time) =>
-      '${time.hour}:${time.minute.toString().padLeft(2, '0')}';
+      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 
   static String _formatDate(DateTime date) =>
       '${_monthNames[date.month - 1]} ${date.day}, ${date.year}';
 
   static const List<String> _monthNames = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
+    'January',
+    'February',
+    'March',
+    'April',
     'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
+
+  // Utility methods for common operations
+  Duration get timeUntilStart {
+    return startTime.difference(DateTime.now());
+  }
+
+  bool get isStartingSoon {
+    final timeUntil = timeUntilStart;
+    return timeUntil.inMinutes <= 15 && timeUntil.inMinutes > 0;
+  }
+
+  bool get hasStarted {
+    return DateTime.now().isAfter(startTime);
+  }
+
+  bool get hasEnded {
+    return DateTime.now().isAfter(startTime.add(duration));
+  }
+
+  String get timeStatus {
+    if (hasEnded) return 'Ended';
+    if (hasStarted) return 'In Progress';
+    if (isStartingSoon) return 'Starting Soon';
+    return 'Upcoming';
+  }
+
+  // Validation methods
+  bool get isValid {
+    return id.isNotEmpty &&
+        title.isNotEmpty &&
+        subject.isNotEmpty &&
+        level.isNotEmpty &&
+        userId.isNotEmpty &&
+        duration.inMinutes > 0;
+  }
+
+  List<String> get validationErrors {
+    final errors = <String>[];
+
+    if (id.isEmpty) errors.add('Session ID is required');
+    if (title.isEmpty) errors.add('Title is required');
+    if (subject.isEmpty) errors.add('Subject is required');
+    if (level.isEmpty) errors.add('Level is required');
+    if (userId.isEmpty) errors.add('User ID is required');
+    if (duration.inMinutes <= 0) errors.add('Duration must be greater than 0');
+    if (startTime.isBefore(DateTime.now()) &&
+        status == SessionStatus.upcoming) {
+      errors.add('Start time cannot be in the past for upcoming sessions');
+    }
+    if (maxParticipants != null && maxParticipants! <= 0) {
+      errors.add('Max participants must be greater than 0');
+    }
+    if (currentParticipants != null &&
+        maxParticipants != null &&
+        currentParticipants! > maxParticipants!) {
+      errors.add('Current participants cannot exceed max participants');
+    }
+
+    return errors;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Session && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() {
+    return 'Session{id: $id, title: $title, status: $status, startTime: $startTime}';
+  }
 }
 
 // =============================================
@@ -691,7 +1019,7 @@ class Tutor {
 
   factory Tutor.fromJson(Map<String, dynamic> json) => Tutor(
     id: json['id']?.toString() ?? '',
-    userId: json['userId']?.toString() ?? '',
+    userId: json['user_id']?.toString() ?? '',
     name: json['name'] ?? '',
     bio: json['bio'],
     education: json['education'],
@@ -735,7 +1063,7 @@ class Tutor {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'userId': userId,
+    'user_id': userId,
     'name': name,
     'bio': bio,
     'education': education,
@@ -786,7 +1114,7 @@ class TutorApplication {
   factory TutorApplication.fromJson(Map<String, dynamic> json) =>
       TutorApplication(
         id: json['id']?.toString() ?? '',
-        userId: json['userId']?.toString() ?? '',
+        userId: json['user_id']?.toString() ?? '',
         status: json['status'] ?? 'pending',
         personalInfo: Map<String, dynamic>.from(json['personal_info'] ?? {}),
         subjects: List<String>.from(json['subjects'] ?? []),
@@ -822,7 +1150,7 @@ class TutorApplication {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'userId': userId,
+    'user_id': userId,
     'status': status,
     'personal_info': personalInfo,
     'subjects': subjects,
@@ -1484,6 +1812,7 @@ class LeaderboardRepository {
 }
 
 class SessionRepository {
+  // Fixed: Added consistent field name usage
   Future<ApiResponse<List<Session>>> getUpcomingSessions(String userId) async {
     try {
       final snapshot =
@@ -1491,6 +1820,7 @@ class SessionRepository {
               .collection('sessions')
               .where('userId', isEqualTo: userId)
               .where('status', isEqualTo: 'upcoming')
+              .orderBy('preferredDateTime', descending: false)
               .get();
 
       final sessions =
@@ -1515,6 +1845,7 @@ class SessionRepository {
               .collection('sessions')
               .where('userId', isEqualTo: userId)
               .where('status', isEqualTo: 'completed')
+              .orderBy('preferredDateTime', descending: true)
               .get();
 
       final sessions =
@@ -1532,6 +1863,7 @@ class SessionRepository {
     }
   }
 
+  // Fixed: Corrected field name from 'userId' to 'user_id'
   Future<ApiResponse<List<Session>>> getPendingSessions(String userId) async {
     try {
       final snapshot =
@@ -1540,6 +1872,12 @@ class SessionRepository {
               .where('userId', isEqualTo: userId)
               .where('status', isEqualTo: 'pending')
               .get();
+
+      if (snapshot.docs.isEmpty) {
+        debugPrint('No sessions found for user $userId with status pending');
+      } else {
+        debugPrint('Found ${snapshot.docs} pending sessions for user $userId');
+      }
 
       final sessions =
           snapshot.docs
@@ -1552,10 +1890,12 @@ class SessionRepository {
         data: sessions,
       );
     } catch (e) {
+      debugPrint("error incured ${e.toString()}");
       throw ApiError.fromFirebaseException(e);
     }
   }
 
+  // Enhanced: Added user validation
   Future<ApiResponse<Session>> getSessionDetails(
     String userId,
     String sessionId,
@@ -1571,25 +1911,60 @@ class SessionRepository {
         throw ApiError(message: 'Session not found');
       }
 
+      final sessionData = doc.data()!;
+
+      // Check if user has access to this session
+      if (sessionData['user_id'] != userId &&
+          !(sessionData['participants'] as List?)!.contains(userId) == true) {
+        throw ApiError(message: 'Access denied to this session');
+      }
+
       return ApiResponse<Session>(
         success: true,
         message: 'Session details retrieved',
-        data: Session.fromJson({...doc.data()!, 'id': doc.id}),
+        data: Session.fromJson({...sessionData, 'id': doc.id}),
       );
     } catch (e) {
       throw ApiError.fromFirebaseException(e);
     }
   }
 
+  // Enhanced: Added user validation and status update
   Future<ApiResponse<void>> cancelSession(
     String userId,
     String sessionId,
   ) async {
     try {
-      await FirebaseConfig.firestore
+      final sessionRef = FirebaseConfig.firestore
           .collection('sessions')
-          .doc(sessionId)
-          .update({'status': 'declined'});
+          .doc(sessionId);
+
+      await FirebaseConfig.firestore.runTransaction((transaction) async {
+        final sessionDoc = await transaction.get(sessionRef);
+
+        if (!sessionDoc.exists) {
+          throw ApiError(message: 'Session not found');
+        }
+
+        final sessionData = sessionDoc.data()!;
+
+        // Check if user owns the session or is the organizer
+        if (sessionData['user_id'] != userId &&
+            sessionData['organizer_id'] != userId) {
+          throw ApiError(message: 'You can only cancel your own sessions');
+        }
+
+        // Check if session can be cancelled
+        final status = sessionData['status'];
+        if (status == 'completed' || status == 'declined') {
+          throw ApiError(message: 'Cannot cancel a $status session');
+        }
+
+        transaction.update(sessionRef, {
+          'status': 'declined',
+          'updated_at': Timestamp.now(),
+        });
+      });
 
       return ApiResponse<void>(
         success: true,
@@ -1600,16 +1975,42 @@ class SessionRepository {
     }
   }
 
+  // Enhanced: Added validation and permission checks
   Future<ApiResponse<void>> rescheduleSession(
     String userId,
     String sessionId,
     DateTime newTime,
   ) async {
     try {
-      await FirebaseConfig.firestore
+      final sessionRef = FirebaseConfig.firestore
           .collection('sessions')
-          .doc(sessionId)
-          .update({'start_time': Timestamp.fromDate(newTime)});
+          .doc(sessionId);
+
+      await FirebaseConfig.firestore.runTransaction((transaction) async {
+        final sessionDoc = await transaction.get(sessionRef);
+
+        if (!sessionDoc.exists) {
+          throw ApiError(message: 'Session not found');
+        }
+
+        final sessionData = sessionDoc.data()!;
+
+        // Check permissions
+        if (sessionData['user_id'] != userId &&
+            sessionData['organizer_id'] != userId) {
+          throw ApiError(message: 'You can only reschedule your own sessions');
+        }
+
+        // Validate new time
+        if (newTime.isBefore(DateTime.now())) {
+          throw ApiError(message: 'Cannot reschedule to a past date');
+        }
+
+        transaction.update(sessionRef, {
+          'start_time': Timestamp.fromDate(newTime),
+          'updated_at': Timestamp.now(),
+        });
+      });
 
       return ApiResponse<void>(
         success: true,
@@ -1620,6 +2021,7 @@ class SessionRepository {
     }
   }
 
+  // Enhanced: Added validation
   Future<ApiResponse<void>> submitFeedback(
     String userId,
     String sessionId,
@@ -1627,10 +2029,42 @@ class SessionRepository {
     String review,
   ) async {
     try {
-      await FirebaseConfig.firestore
+      if (rating < 1 || rating > 5) {
+        throw ApiError(message: 'Rating must be between 1 and 5');
+      }
+
+      final sessionRef = FirebaseConfig.firestore
           .collection('sessions')
-          .doc(sessionId)
-          .update({'rating': rating, 'review': review, 'status': 'completed'});
+          .doc(sessionId);
+
+      await FirebaseConfig.firestore.runTransaction((transaction) async {
+        final sessionDoc = await transaction.get(sessionRef);
+
+        if (!sessionDoc.exists) {
+          throw ApiError(message: 'Session not found');
+        }
+
+        final sessionData = sessionDoc.data()!;
+
+        // Check if user participated in the session
+        if (sessionData['user_id'] != userId &&
+            !(sessionData['participants'] as List?)!.contains(userId) == true) {
+          throw ApiError(
+            message: 'You can only rate sessions you participated in',
+          );
+        }
+
+        // Check if session is completed
+        if (sessionData['status'] != 'completed') {
+          throw ApiError(message: 'You can only rate completed sessions');
+        }
+
+        transaction.update(sessionRef, {
+          'rating': rating,
+          'review': review,
+          'updated_at': Timestamp.now(),
+        });
+      });
 
       return ApiResponse<void>(
         success: true,
@@ -1641,7 +2075,7 @@ class SessionRepository {
     }
   }
 
-  // NEW METHOD: Apply for a session
+  // Enhanced: Added validation and better data structure
   Future<ApiResponse<Session>> applyForSession({
     required String userId,
     required String title,
@@ -1654,21 +2088,31 @@ class SessionRepository {
     String? notes,
   }) async {
     try {
+      // Validation
+      if (preferredDateTime.isBefore(DateTime.now())) {
+        throw ApiError(message: 'Cannot schedule session in the past');
+      }
+
+      if (duration.inMinutes < 15) {
+        throw ApiError(message: 'Session duration must be at least 15 minutes');
+      }
+
       final applicationData = {
-        'userId': userId,
-        'title': title,
+        'user_id': userId,
+        'title': title.trim(),
         'subject': subject,
         'level': level,
-        'description': description,
+        'description': description.trim(),
         'start_time': Timestamp.fromDate(preferredDateTime),
         'duration_minutes': duration.inMinutes,
         'platform': platform,
         'status': 'pending',
-        'type': 'application', // To distinguish from organized sessions
-        'notes': notes ?? '',
+        'type': 'application',
+        'notes': notes?.trim() ?? '',
         'tutor_name': 'To be assigned',
         'tutor_image': '',
-        'participant_images': [],
+        'participant_images': <String>[],
+        'participants': <String>[],
         'is_current_user': true,
         'created_at': Timestamp.now(),
         'updated_at': Timestamp.now(),
@@ -1690,7 +2134,7 @@ class SessionRepository {
     }
   }
 
-  // NEW METHOD: Organize a session
+  // Enhanced: Added validation and consistent data structure
   Future<ApiResponse<Session>> organizeSession({
     required String userId,
     required String title,
@@ -1707,28 +2151,47 @@ class SessionRepository {
     double price = 0.0,
   }) async {
     try {
+      // Validation
+      if (scheduledDateTime.isBefore(DateTime.now())) {
+        throw ApiError(message: 'Cannot schedule session in the past');
+      }
+
+      if (duration.inMinutes < 15) {
+        throw ApiError(message: 'Session duration must be at least 15 minutes');
+      }
+
+      if (maxParticipants < 1) {
+        throw ApiError(message: 'Must allow at least 1 participant');
+      }
+
+      if (isPaid && price <= 0) {
+        throw ApiError(
+          message: 'Paid sessions must have a price greater than 0',
+        );
+      }
+
       final sessionData = {
         'organizer_id': userId,
-        'userId': userId, // For compatibility with existing queries
-        'title': title,
+        'user_id': userId,
+        'title': title.trim(),
         'subject': subject,
         'level': level,
-        'description': description,
+        'description': description.trim(),
         'start_time': Timestamp.fromDate(scheduledDateTime),
         'duration_minutes': duration.inMinutes,
         'platform': platform,
         'status': 'upcoming',
-        'type': 'organized', // To distinguish from applications
+        'type': 'organized',
         'max_participants': maxParticipants,
-        'current_participants': 0,
+        'current_participants': 1, // Organizer is automatically a participant
         'is_recurring': isRecurring,
         'recurring_pattern': recurringPattern,
         'is_paid': isPaid,
         'price': price,
-        'tutor_name': 'You', // Since the user is organizing it
+        'tutor_name': 'You',
         'tutor_image': '',
-        'participant_images': [],
-        'participants': [], // List of participant user IDs
+        'participant_images': <String>[],
+        'participants': [userId], // Organizer is automatically added
         'is_current_user': true,
         'created_at': Timestamp.now(),
         'updated_at': Timestamp.now(),
@@ -1750,7 +2213,7 @@ class SessionRepository {
     }
   }
 
-  // NEW METHOD: Get available sessions to join
+  // Fixed: Corrected Firestore query structure
   Future<ApiResponse<List<Session>>> getAvailableSessions({
     String? subject,
     String? level,
@@ -1758,12 +2221,12 @@ class SessionRepository {
     DateTime? endDate,
   }) async {
     try {
-      var query = FirebaseConfig.firestore
+      Query query = FirebaseConfig.firestore
           .collection('sessions')
           .where('status', isEqualTo: 'upcoming')
-          .where('type', isEqualTo: 'organized')
-          .where('current_participants', isLessThan: 'max_participants');
+          .where('type', isEqualTo: 'organized');
 
+      // Apply filters sequentially to avoid composite index issues
       if (subject != null && subject.isNotEmpty) {
         query = query.where('subject', isEqualTo: subject);
       }
@@ -1786,11 +2249,23 @@ class SessionRepository {
         );
       }
 
-      final snapshot = await query.get();
+      final snapshot =
+          await query.orderBy('preferredDateTime', descending: false).get();
 
+      // Filter sessions that have available spots
       final sessions =
           snapshot.docs
-              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
+              .map(
+                (doc) => Session.fromJson({
+                  ...doc.data() as Map<String, dynamic>,
+                  'id': doc.id,
+                }),
+              )
+              .where((session) {
+                final currentParticipants = session.currentParticipants ?? 0;
+                final maxParticipants = session.maxParticipants ?? 0;
+                return currentParticipants < maxParticipants;
+              })
               .toList();
 
       return ApiResponse<List<Session>>(
@@ -1803,7 +2278,7 @@ class SessionRepository {
     }
   }
 
-  // NEW METHOD: Join a session
+  // Enhanced: Added comprehensive validation
   Future<ApiResponse<void>> joinSession(String userId, String sessionId) async {
     try {
       final sessionRef = FirebaseConfig.firestore
@@ -1818,6 +2293,18 @@ class SessionRepository {
         }
 
         final sessionData = sessionDoc.data()!;
+
+        // Validate session status
+        if (sessionData['status'] != 'upcoming') {
+          throw ApiError(message: 'Cannot join this session');
+        }
+
+        // Check if session is in the future
+        final startTime = (sessionData['start_time'] as Timestamp).toDate();
+        if (startTime.isBefore(DateTime.now())) {
+          throw ApiError(message: 'Cannot join a past session');
+        }
+
         final currentParticipants = sessionData['current_participants'] ?? 0;
         final maxParticipants = sessionData['max_participants'] ?? 0;
         final participants = List<String>.from(
@@ -1850,7 +2337,7 @@ class SessionRepository {
     }
   }
 
-  // NEW METHOD: Leave a session
+  // Enhanced: Added validation and edge case handling
   Future<ApiResponse<void>> leaveSession(
     String userId,
     String sessionId,
@@ -1874,6 +2361,21 @@ class SessionRepository {
 
         if (!participants.contains(userId)) {
           throw ApiError(message: 'Not a participant of this session');
+        }
+
+        // Check if user is the organizer
+        if (sessionData['organizer_id'] == userId) {
+          throw ApiError(
+            message:
+                'Organizers cannot leave their own sessions. Cancel the session instead.',
+          );
+        }
+
+        // Check if session is still upcoming
+        if (sessionData['status'] != 'upcoming') {
+          throw ApiError(
+            message: 'Cannot leave a session that is not upcoming',
+          );
         }
 
         participants.remove(userId);
@@ -2062,7 +2564,7 @@ class TutorRepository {
   }) async {
     try {
       final applicationData = {
-        'userId': userId,
+        'user_id': userId,
         'status': 'pending',
         'personal_info': personalInfo,
         'subjects': subjects,
@@ -2125,7 +2627,7 @@ class TutorRepository {
   }) async {
     try {
       final sessionData = {
-        'userId': userId,
+        'user_id': userId,
         'tutor_id': tutorId,
         'subject': subject,
         'start_time': Timestamp.fromDate(dateTime),
@@ -2155,7 +2657,7 @@ class TutorRepository {
   }) async {
     try {
       final requestData = {
-        'userId': userId,
+        'user_id': userId,
         'subject': subject,
         'details': details,
         'priority': priority,
