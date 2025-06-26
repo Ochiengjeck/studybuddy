@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../../utils/providers/providers.dart';
 
 class SubmitApplicationScreen extends StatefulWidget {
-  final Map<String, dynamic> applicationData;
-  final Function(bool) onAgreementChanged;
-  final Function(bool) onAccuracyChanged;
-  final VoidCallback onSubmit;
+  final Map<String, dynamic> personalInfo;
+  final List<String> subjects;
+  final Map<String, List<String>> availability;
+  final String? teachingMode;
+  final String? venue;
+  final bool agreementChecked;
+  final bool accuracyChecked;
+  final ValueChanged<bool> onAgreementChanged;
+  final ValueChanged<bool> onAccuracyChanged;
 
   const SubmitApplicationScreen({
     super.key,
-    required this.applicationData,
+    required this.personalInfo,
+    required this.subjects,
+    required this.availability,
+    required this.agreementChecked,
+    required this.accuracyChecked,
     required this.onAgreementChanged,
     required this.onAccuracyChanged,
-    required this.onSubmit,
+    this.teachingMode,
+    this.venue,
   });
 
   @override
@@ -29,9 +41,8 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
   @override
   void initState() {
     super.initState();
-    _agreementChecked = widget.applicationData['agreementChecked'] ?? false;
-    _accuracyChecked = widget.applicationData['accuracyChecked'] ?? false;
-
+    _agreementChecked = false;
+    _accuracyChecked = false;
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -39,7 +50,6 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-
     _animationController.forward();
   }
 
@@ -47,6 +57,129 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitApplication(BuildContext context) async {
+    if (!_agreementChecked || !_accuracyChecked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please agree to all terms and confirm accuracy'),
+        ),
+      );
+      return;
+    }
+
+    final tutorProvider = Provider.of<TutorProvider>(context, listen: false);
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final userId = appProvider.currentUser?.id;
+
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to submit application')),
+      );
+      return;
+    }
+
+    try {
+      await tutorProvider.submitTutorApplication(
+        userId: userId,
+        personalInfo: widget.personalInfo,
+        subjects: widget.subjects,
+        availability: widget.availability,
+        teachingMode: widget.teachingMode,
+        venue: widget.venue,
+      );
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              contentPadding: const EdgeInsets.all(24),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.teal.shade600,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Application Submitted!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Thank you for your tutor application. We will review it and get back to you within 2-5 working days.',
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Reference: #${DateTime.now().millisecondsSinceEpoch}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.popUntil(context, (route) => route.isFirst);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal.shade600,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${tutorProvider.error ?? e.toString()}'),
+        ),
+      );
+    }
   }
 
   Widget _buildFormField({
@@ -208,7 +341,8 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
   }
 
   Widget _buildAvailabilityDisplay(Map<String, List<String>> availability) {
-    if (availability.isEmpty) {
+    if (availability.isEmpty ||
+        availability.values.every((slots) => slots.isEmpty)) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -233,7 +367,9 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children:
-            availability.entries.map((entry) {
+            availability.entries.where((entry) => entry.value.isNotEmpty).map((
+              entry,
+            ) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Column(
@@ -286,13 +422,7 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
 
   @override
   Widget build(BuildContext context) {
-    final personalInfo =
-        widget.applicationData['personalInfo'] as Map<String, dynamic>;
-    final subjects = widget.applicationData['subjects'] as List<String>;
-    final availability =
-        widget.applicationData['availability'] as Map<String, List<String>>;
-    final mode = widget.applicationData['teachingMode'] as String?;
-    final venue = widget.applicationData['venue'] as String?;
+    final tutorProvider = Provider.of<TutorProvider>(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -392,40 +522,34 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
                       Icons.person_outline_rounded,
                       Colors.blue.shade600,
                     ),
+                    // Update the personal info display to match what's collected:
                     _buildFormField(
                       label: 'Full Name',
-                      value: personalInfo['fullName'] ?? '',
+                      value: widget.personalInfo['fullName'] ?? '',
                       icon: Icons.person_outline_rounded,
                       iconColor: Colors.blue.shade600,
                     ),
                     _buildFormField(
-                      label: 'Email Address',
-                      value: personalInfo['email'] ?? '',
+                      label: 'Email',
+                      value: widget.personalInfo['email'] ?? '',
                       icon: Icons.email_outlined,
                       iconColor: Colors.green.shade600,
                     ),
                     _buildFormField(
-                      label: 'Phone Number',
-                      value: personalInfo['phone'] ?? '',
+                      label: 'Phone',
+                      value: widget.personalInfo['phone'] ?? '',
                       icon: Icons.phone_outlined,
                       iconColor: Colors.orange.shade600,
                     ),
                     _buildFormField(
                       label: 'Year of Study',
-                      value: personalInfo['yearOfStudy'] ?? '',
-                      icon: Icons.calendar_today_outlined,
-                      iconColor: Colors.purple.shade600,
-                    ),
-                    _buildFormField(
-                      label: 'Field of Study',
-                      value: personalInfo['fieldOfStudy'] ?? '',
+                      value: widget.personalInfo['yearOfStudy'] ?? '',
                       icon: Icons.school_outlined,
                       iconColor: Colors.teal.shade600,
                     ),
                     _buildFormField(
-                      label: 'Teaching Experience',
-                      value: personalInfo['experience'] ?? '',
-                      maxLines: 3,
+                      label: 'Field of Study',
+                      value: widget.personalInfo['fieldOfStudy'] ?? '',
                       icon: Icons.work_outline_rounded,
                       iconColor: Colors.pink.shade600,
                     ),
@@ -456,7 +580,7 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
                       Icons.subject_outlined,
                       Colors.indigo.shade600,
                     ),
-                    _buildSubjectChips(subjects),
+                    _buildSubjectChips(widget.subjects),
                   ],
                 ),
               ),
@@ -484,7 +608,7 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
                       Icons.schedule_outlined,
                       Colors.green.shade600,
                     ),
-                    _buildAvailabilityDisplay(availability),
+                    _buildAvailabilityDisplay(widget.availability),
                   ],
                 ),
               ),
@@ -514,14 +638,14 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
                     ),
                     _buildFormField(
                       label: 'Preferred Teaching Mode',
-                      value: mode ?? '',
+                      value: widget.teachingMode ?? '',
                       icon: Icons.computer_outlined,
                       iconColor: Colors.orange.shade600,
                     ),
-                    if (venue != null && venue.isNotEmpty)
+                    if (widget.venue != null && widget.venue!.isNotEmpty)
                       _buildFormField(
                         label: 'Preferred Venue/Address',
-                        value: venue,
+                        value: widget.venue!,
                         maxLines: 2,
                         icon: Icons.location_on_outlined,
                         iconColor: Colors.red.shade600,
@@ -584,49 +708,38 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
                     ),
                     const SizedBox(height: 20),
                     CheckboxListTile(
-                      title: const Text(
-                        'I agree to the Terms and Conditions',
-                        style: TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                      subtitle: const Text(
-                        'By checking this, you agree to our platform terms, privacy policy, and tutoring guidelines.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                      value: _agreementChecked,
+                      title: const Text('I agree to the Terms and Conditions'),
+                      value: widget.agreementChecked,
                       onChanged: (value) {
-                        setState(() {
-                          _agreementChecked = value ?? false;
-                          widget.onAgreementChanged(_agreementChecked);
-                        });
+                        if (value != null) widget.onAgreementChanged(value);
                       },
                       controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: Colors.purple.shade600,
                     ),
-                    const Divider(),
+
                     CheckboxListTile(
                       title: const Text(
                         'I confirm all information is accurate',
-                        style: TextStyle(fontWeight: FontWeight.w500),
                       ),
-                      subtitle: const Text(
-                        'I certify that all information provided in this application is true and complete.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                      value: _accuracyChecked,
+                      value: widget.accuracyChecked,
                       onChanged: (value) {
-                        setState(() {
-                          _accuracyChecked = value ?? false;
-                          widget.onAccuracyChanged(_accuracyChecked);
-                        });
+                        if (value != null) widget.onAccuracyChanged(value);
                       },
                       controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: Colors.purple.shade600,
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 32),
+              // Error Display
+              if (tutorProvider.error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Text(
+                    tutorProvider.error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
             ],
           ),
         ),

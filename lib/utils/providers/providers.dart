@@ -951,6 +951,97 @@ class TutorProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  Future<void> requestTutor({
+    required String userId,
+    required String subject,
+    required String details,
+    String? priority,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repository.createTutorRequest(
+        userId: userId,
+        subject: subject,
+        details: details,
+        priority: priority,
+      );
+      _isLoading = false;
+      notifyListeners();
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> bookTutorSession({
+    required String userId,
+    required String tutorId,
+    required String subject,
+    required DateTime dateTime,
+    required String duration,
+    required String platform,
+    required String description,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repository.bookSession(
+        userId: userId,
+        tutorId: tutorId,
+        subject: subject,
+        dateTime: dateTime,
+        duration: int.parse(duration),
+        platform: platform,
+        description: description,
+      );
+      _isLoading = false;
+      notifyListeners();
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> submitTutorApplication({
+    required String userId,
+    required Map<String, dynamic> personalInfo,
+    required List<String> subjects,
+    required Map<String, List<String>> availability,
+    String? teachingMode,
+    String? venue,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repository.submitTutorApplication(
+        userId: userId,
+        personalInfo: personalInfo,
+        subjects: subjects,
+        availability: availability,
+        teachingMode: teachingMode,
+        venue: venue,
+      );
+      _isLoading = false;
+      notifyListeners();
+    } on ApiError catch (e) {
+      _isLoading = false;
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
 }
 
 // 8. Chat Provider

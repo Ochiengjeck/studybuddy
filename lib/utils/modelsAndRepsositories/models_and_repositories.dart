@@ -971,7 +971,7 @@ class Activity {
 }
 
 // =============================================
-// 8. Tutor Models
+// 8. Tutor Models (Unchanged)
 // =============================================
 
 class Tutor {
@@ -2595,7 +2595,7 @@ class TutorRepository {
       final snapshot =
           await FirebaseConfig.firestore
               .collection('tutor_applications')
-              .where('userId', isEqualTo: userId)
+              .where('user_id', isEqualTo: userId)
               .get();
 
       final applications =
@@ -2616,6 +2616,66 @@ class TutorRepository {
     }
   }
 
+  Future<ApiResponse<String>> requestTutor({
+    required String userId,
+    required String subject,
+    required String details,
+    String? priority,
+  }) async {
+    try {
+      final requestData = {
+        'user_id': userId,
+        'subject': subject,
+        'details': details,
+        'priority': priority ?? 'normal',
+        'created_at': Timestamp.now(),
+        'status': 'pending',
+      };
+
+      final docRef = await FirebaseConfig.firestore
+          .collection('tutor_requests')
+          .add(requestData);
+
+      return ApiResponse<String>(
+        success: true,
+        message: 'Tutor request submitted successfully',
+        data: docRef.id,
+      );
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  Future<ApiResponse<String>> createTutorRequest({
+    required String userId,
+    required String subject,
+    required String details,
+    String? priority,
+  }) async {
+    try {
+      final requestData = {
+        'user_id': userId,
+        'subject': subject,
+        'details': details,
+        'priority': priority ?? 'normal',
+        'created_at': Timestamp.now(),
+        'status': 'pending',
+      };
+
+      final docRef = await FirebaseConfig.firestore
+          .collection('tutor_requests')
+          .add(requestData);
+
+      return ApiResponse<String>(
+        success: true,
+        message: 'Tutor request created successfully',
+        data: docRef.id,
+      );
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
   Future<ApiResponse<void>> bookTutorSession({
     required String userId,
     required String tutorId,
@@ -2626,16 +2686,61 @@ class TutorRepository {
     String? description,
   }) async {
     try {
+      // Validate inputs
+      if (dateTime.isBefore(DateTime.now())) {
+        throw ApiError(message: 'Cannot schedule session in the past');
+      }
+
+      int durationMinutes;
+      try {
+        durationMinutes = int.parse(duration);
+        if (durationMinutes < 15) {
+          throw ApiError(
+            message: 'Session duration must be at least 15 minutes',
+          );
+        }
+      } catch (e) {
+        throw ApiError(message: 'Invalid duration format');
+      }
+
+      // Fetch tutor details for tutorName and tutorImage
+      final tutorDoc =
+          await FirebaseConfig.firestore
+              .collection('tutors')
+              .doc(tutorId)
+              .get();
+
+      if (!tutorDoc.exists) {
+        throw ApiError(message: 'Tutor not found');
+      }
+
+      final tutorData = tutorDoc.data()!;
+      final tutorName = tutorData['name'] ?? 'Unknown Tutor';
+      final tutorImage = tutorData['profile_picture'] ?? '';
+
+      // Validate subject
+      final subjects = List<String>.from(tutorData['subjects'] ?? []);
+      if (!subjects.contains(subject)) {
+        throw ApiError(message: 'Tutor does not teach this subject');
+      }
+
       final sessionData = {
-        'user_id': userId,
-        'tutor_id': tutorId,
+        'userId': userId,
+        'tutorId': tutorId,
         'subject': subject,
         'start_time': Timestamp.fromDate(dateTime),
-        'duration_minutes': int.parse(duration),
+        'duration_minutes': durationMinutes,
         'platform': platform,
-        'description': description,
+        'description': description ?? '',
         'status': 'pending',
+        'type': 'application',
+        'tutor_name': tutorName,
+        'tutor_image': tutorImage,
+        'participant_images': <String>[],
+        'participants': [userId],
         'is_current_user': true,
+        'created_at': Timestamp.now(),
+        'updated_at': Timestamp.now(),
       };
 
       await FirebaseConfig.firestore.collection('sessions').add(sessionData);
@@ -2649,28 +2754,73 @@ class TutorRepository {
     }
   }
 
-  Future<ApiResponse<void>> requestTutor({
+  Future<ApiResponse<String>> bookSession({
     required String userId,
+    required String tutorId,
     required String subject,
-    required String details,
-    String? priority,
+    required DateTime dateTime,
+    required int duration,
+    required String platform,
+    required String description,
   }) async {
     try {
-      final requestData = {
-        'user_id': userId,
+      // Validate inputs
+      if (dateTime.isBefore(DateTime.now())) {
+        throw ApiError(message: 'Cannot schedule session in the past');
+      }
+
+      if (duration < 15) {
+        throw ApiError(message: 'Session duration must be at least 15 minutes');
+      }
+
+      // Fetch tutor details for tutorName and tutorImage
+      final tutorDoc =
+          await FirebaseConfig.firestore
+              .collection('tutors')
+              .doc(tutorId)
+              .get();
+
+      if (!tutorDoc.exists) {
+        throw ApiError(message: 'Tutor not found');
+      }
+
+      final tutorData = tutorDoc.data()!;
+      final tutorName = tutorData['name'] ?? 'Unknown Tutor';
+      final tutorImage = tutorData['profile_picture'] ?? '';
+
+      // Validate subject
+      final subjects = List<String>.from(tutorData['subjects'] ?? []);
+      if (!subjects.contains(subject)) {
+        throw ApiError(message: 'Tutor does not teach this subject');
+      }
+
+      final sessionData = {
+        'userId': userId,
+        'tutorId': tutorId,
         'subject': subject,
-        'details': details,
-        'priority': priority,
+        'start_time': Timestamp.fromDate(dateTime),
+        'duration_minutes': duration,
+        'platform': platform,
+        'description': description,
+        'status': 'pending',
+        'type': 'application',
+        'tutor_name': tutorName,
+        'tutor_image': tutorImage,
+        'participant_images': <String>[],
+        'participants': [userId],
+        'is_current_user': true,
         'created_at': Timestamp.now(),
+        'updated_at': Timestamp.now(),
       };
 
-      await FirebaseConfig.firestore
-          .collection('tutor_requests')
-          .add(requestData);
+      final docRef = await FirebaseConfig.firestore
+          .collection('sessions')
+          .add(sessionData);
 
-      return ApiResponse<void>(
+      return ApiResponse<String>(
         success: true,
-        message: 'Tutor request submitted successfully',
+        message: 'Session booked successfully',
+        data: docRef.id,
       );
     } catch (e) {
       throw ApiError.fromFirebaseException(e);

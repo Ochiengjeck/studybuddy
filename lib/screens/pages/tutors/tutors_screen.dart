@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:studybuddy/screens/pages/tutors/apply_tutor/apply_tutor_flow.dart';
-import 'package:studybuddy/screens/pages/tutors/request_tutor_screen.dart';
-import 'package:studybuddy/screens/pages/tutors/tutor_details_screen.dart';
-
+import 'package:provider/provider.dart';
+import '../../../utils/providers/providers.dart';
+import 'apply_tutor/apply_tutor_flow.dart';
+import 'request_tutor_screen.dart';
+import 'tutor_details_screen.dart';
 import '../../../widgets/tutor_card.dart';
 
 class TutorsScreen extends StatefulWidget {
@@ -60,6 +61,9 @@ class _TutorsScreenState extends State<TutorsScreen>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<TutorProvider>(context, listen: false).loadTutors();
+    });
   }
 
   @override
@@ -73,6 +77,7 @@ class _TutorsScreenState extends State<TutorsScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 768;
     final crossAxisCount = isTablet ? 3 : 1;
+    final tutorProvider = Provider.of<TutorProvider>(context);
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -110,6 +115,22 @@ class _TutorsScreenState extends State<TutorsScreen>
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.all(20),
                         ),
+                        onSubmitted: (value) {
+                          tutorProvider.loadTutors(
+                            subject: value.trim().isEmpty ? null : value.trim(),
+                            availability:
+                                _selectedAvailability == 'Any Time'
+                                    ? null
+                                    : _selectedAvailability,
+                            minRating:
+                                _selectedRating == null ||
+                                        _selectedRating == 'Any Rating'
+                                    ? null
+                                    : double.parse(
+                                      _selectedRating!.split('+')[0],
+                                    ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -265,6 +286,7 @@ class _TutorsScreenState extends State<TutorsScreen>
                                                 _selectedAvailability = null;
                                                 _selectedRating = null;
                                               });
+                                              tutorProvider.loadTutors();
                                             },
                                             style: OutlinedButton.styleFrom(
                                               padding:
@@ -283,7 +305,29 @@ class _TutorsScreenState extends State<TutorsScreen>
                                         Expanded(
                                           flex: 2,
                                           child: ElevatedButton(
-                                            onPressed: () {},
+                                            onPressed: () {
+                                              tutorProvider.loadTutors(
+                                                subject:
+                                                    _selectedSubject ==
+                                                            'All Subjects'
+                                                        ? null
+                                                        : _selectedSubject,
+                                                availability:
+                                                    _selectedAvailability ==
+                                                            'Any Time'
+                                                        ? null
+                                                        : _selectedAvailability,
+                                                minRating:
+                                                    _selectedRating == null ||
+                                                            _selectedRating ==
+                                                                'Any Rating'
+                                                        ? null
+                                                        : double.parse(
+                                                          _selectedRating!
+                                                              .split('+')[0],
+                                                        ),
+                                              );
+                                            },
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor:
                                                   Colors.blue.shade600,
@@ -329,51 +373,85 @@ class _TutorsScreenState extends State<TutorsScreen>
             // Tutors Grid
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: isTablet? .55 : .9,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  return AnimatedContainer(
-                    duration: Duration(milliseconds: 300 + (index * 50)),
-                    curve: Curves.easeOutBack,
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) => TutorDetailsScreen(
-                                  name: _getTutorName(index),
-                                  subjects: _getTutorSubjects(index),
-                                  rating: _getTutorRating(index),
-                                  sessions: _getTutorSessions(index),
-                                  points: _getTutorPoints(index),
-                                  badges: _getTutorBadges(index),
-                                  isAvailable: index % 2 == 0,
+              sliver: SliverToBoxAdapter(
+                child:
+                    tutorProvider.isLoading && tutorProvider.tutors == null
+                        ? const Center(child: CircularProgressIndicator())
+                        : tutorProvider.error != null
+                        ? Center(child: Text('Error: ${tutorProvider.error}'))
+                        : tutorProvider.tutors == null ||
+                            tutorProvider.tutors!.isEmpty
+                        ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Center(child: Image.asset('assets/no_results.png')),
+                            Text(
+                              tutorProvider.tutors!.isEmpty
+                                  ? 'No tutors found'
+                                  : 'No tutors match your filters',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        )
+                        : GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                childAspectRatio: isTablet ? 0.55 : 0.9,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                              ),
+                          itemCount:
+                              tutorProvider.tutors!.length +
+                              (tutorProvider.hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == tutorProvider.tutors!.length) {
+                              tutorProvider.loadMoreTutors();
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            final tutor = tutorProvider.tutors![index];
+                            return AnimatedContainer(
+                              duration: Duration(
+                                milliseconds: 300 + (index * 50),
+                              ),
+                              curve: Curves.easeOutBack,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => TutorDetailsScreen(
+                                            tutorId: tutor.id,
+                                          ),
+                                    ),
+                                  );
+                                },
+                                child: TutorCard(
+                                  name: tutor.name,
+                                  subjects: tutor.subjects,
+                                  rating: tutor.rating,
+                                  sessions: 0, // Not stored in Tutor model
+                                  points: 0, // Not stored in Tutor model
+                                  badges: 0, // Not stored in Tutor model
+                                  isAvailable: tutor.availability.isNotEmpty,
                                   imageUrl:
-                                      'https://picsum.photos/200/200?random=${10 + index}',
+                                      tutor.profilePicture ??
+                                      'https://picsum.photos/200/200?random=$index',
                                 ),
-                          ),
-                        );
-                      },
-                      child: TutorCard(
-                        name: _getTutorName(index),
-                        subjects: _getTutorSubjects(index),
-                        rating: _getTutorRating(index),
-                        sessions: _getTutorSessions(index),
-                        points: _getTutorPoints(index),
-                        badges: _getTutorBadges(index),
-                        isAvailable: index % 2 == 0,
-                        imageUrl:
-                            'https://picsum.photos/200/200?random=${10 + index}',
-                      ),
-                    ),
-                  );
-                }, childCount: 6),
+                              ),
+                            );
+                          },
+                        ),
               ),
             ),
 
@@ -382,7 +460,12 @@ class _TutorsScreenState extends State<TutorsScreen>
               child: Container(
                 margin: const EdgeInsets.all(20),
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed:
+                      tutorProvider.isLoading || !tutorProvider.hasMore
+                          ? null
+                          : () {
+                            tutorProvider.loadMoreTutors();
+                          },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.blue.shade600,
@@ -501,45 +584,5 @@ class _TutorsScreenState extends State<TutorsScreen>
         icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
       ),
     );
-  }
-
-  String _getTutorName(int index) {
-    final names = [
-      'Sarah Johnson',
-      'Michael Chen',
-      'Emily Rodriguez',
-      'David Lee',
-      'Robert Wilson',
-      'Jennifer Adams',
-    ];
-    return names[index % names.length];
-  }
-
-  List<String> _getTutorSubjects(int index) {
-    final subjects = [
-      ['Calculus', 'Linear Algebra', 'Mechanics'],
-      ['Python', 'Java', 'Data Structures', 'Algorithms'],
-      ['Microeconomics', 'Macroeconomics', 'Finance', 'Marketing'],
-      ['Organic Chemistry', 'Biochemistry', 'Genetics'],
-      ['Quantum Physics', 'Thermodynamics', 'Differential Equations'],
-      ['Literature', 'Creative Writing', 'European History'],
-    ];
-    return subjects[index % subjects.length];
-  }
-
-  double _getTutorRating(int index) {
-    return [4.8, 5.0, 5.0, 4.9, 4.7, 4.9][index % 6];
-  }
-
-  int _getTutorSessions(int index) {
-    return [250, 180, 95, 320, 210, 175][index % 6];
-  }
-
-  int _getTutorPoints(int index) {
-    return [2500, 2100, 1500, 3200, 2300, 2000][index % 6];
-  }
-
-  int _getTutorBadges(int index) {
-    return [15, 12, 8, 18, 14, 11][index % 6];
   }
 }
