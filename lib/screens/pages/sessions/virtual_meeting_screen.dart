@@ -1,6 +1,18 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+import 'package:tencent_trtc_cloud/trtc_cloud.dart';
+import 'package:tencent_trtc_cloud/trtc_cloud_def.dart';
+import 'package:tencent_trtc_cloud/trtc_cloud_listener.dart';
+import 'package:tencent_trtc_cloud/trtc_cloud_video_view.dart';
+import 'package:tencent_trtc_cloud/tx_audio_effect_manager.dart';
+import 'package:tencent_trtc_cloud/tx_device_manager.dart';
 
 import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../../../utils/providers/providers.dart';
 
 class VirtualMeetingScreen extends StatefulWidget {
   final Session session;
@@ -14,9 +26,235 @@ class VirtualMeetingScreen extends StatefulWidget {
 class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
   bool _isMicOn = true;
   bool _isVideoOn = true;
+  bool _isScreenSharing = false;
+  late TRTCCloud _trtcCloud;
+  late TXDeviceManager _deviceManager;
+  late TXAudioEffectManager _audioEffectManager;
+  bool _isInitialized = false;
+
+  // Replace with your Tencent Cloud credentials
+  final int _appId = int.parse(dotenv.env['APP_ID']!);
+  final String _userId = dotenv.env['USER_ID']!;
+  final String _userSig = dotenv.env['USER_SIG']!;
+  late final String _roomId;
+
+  @override
+  void initState() {
+    super.initState();
+    // Validate environment variables
+    if (dotenv.env['APP_ID'] == null ||
+        dotenv.env['USER_ID'] == null ||
+        dotenv.env['USER_SIG'] == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Missing Tencent Cloud credentials')),
+          );
+        }
+      });
+      return;
+    }
+    // Set roomId from SessionProvider with fallback
+    _roomId = context.read<SessionProvider>().selectedSession?.id ?? '111';
+    // Request permissions before initializing TRTC
+    _requestPermissions().then((granted) {
+      if (granted) {
+        _initializeTRTC();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Camera and microphone permissions are required',
+              ),
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: () => openAppSettings(),
+              ),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<bool> _requestPermissions() async {
+    final Map<Permission, PermissionStatus> statuses =
+        await [Permission.camera, Permission.microphone].request();
+
+    if (statuses[Permission.camera]!.isPermanentlyDenied ||
+        statuses[Permission.microphone]!.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Permissions permanently denied. Please enable them in settings.',
+            ),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => openAppSettings(),
+            ),
+          ),
+        );
+      }
+      return false;
+    }
+
+    return statuses[Permission.camera]!.isGranted &&
+        statuses[Permission.microphone]!.isGranted;
+  }
+
+  Future<void> _initializeTRTC() async {
+    try {
+      // Initialize Tencent RTC SDK
+      _trtcCloud = (await TRTCCloud.sharedInstance())!;
+      _deviceManager = _trtcCloud.getDeviceManager();
+      _audioEffectManager = _trtcCloud.getAudioEffectManager();
+      _trtcCloud.registerListener(onListener);
+
+      // Enter the meeting room
+      await _trtcCloud.enterRoom(
+        TRTCParams(
+          sdkAppId: _appId,
+          userId: _userId,
+          userSig: _userSig,
+          roomId: int.tryParse(_roomId) ?? 111,
+          role: TRTCCloudDef.TRTCRoleAnchor,
+        ),
+        TRTCCloudDef.TRTC_APP_SCENE_VIDEOCALL,
+      );
+
+      // Start local video and audio if permissions are granted
+      if (await Permission.camera.isGranted) {
+        await _trtcCloud.startLocalPreview(true, null);
+      } else {
+        throw Exception('Camera permission denied');
+      }
+
+      if (await Permission.microphone.isGranted) {
+        await _trtcCloud.startLocalAudio(
+          TRTCCloudDef.TRTC_AUDIO_QUALITY_DEFAULT,
+        );
+      } else {
+        throw Exception('Microphone permission denied');
+      }
+
+      setState(() => _isInitialized = true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to initialize TRTC: $e')),
+        );
+      }
+    }
+  }
+
+  void onListener(TRTCCloudListener type, dynamic params) {
+    switch (type) {
+      case TRTCCloudListener.onError:
+        onError(params['errCode'], params['errMsg'], params['extraInfo']);
+        break;
+      case TRTCCloudListener.onUserVideoAvailable:
+        onUserVideoAvailable(params['userId'], params['available']);
+        break;
+      default:
+        break;
+    }
+  }
+
+  void onError(int errCode, String errMsg, dynamic extraInfo) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('TRTC Error: $errMsg (Code: $errCode)')),
+      );
+    }
+  }
+
+  void onUserVideoAvailable(String userId, bool available) {
+    if (mounted) {
+      setState(() {}); // Refresh UI when remote user video changes
+    }
+  }
+
+  Future<void> _toggleMic() async {
+    if (!await Permission.microphone.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required')),
+        );
+      }
+      return;
+    }
+    if (_isMicOn) {
+      await _trtcCloud.muteLocalAudio(true);
+    } else {
+      await _trtcCloud.muteLocalAudio(false);
+    }
+    setState(() => _isMicOn = !_isMicOn);
+  }
+
+  Future<void> _toggleVideo() async {
+    if (!await Permission.camera.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Camera permission is required')),
+        );
+      }
+      return;
+    }
+    if (_isVideoOn) {
+      await _trtcCloud.stopLocalPreview();
+    } else {
+      await _trtcCloud.startLocalPreview(true, null);
+    }
+    setState(() => _isVideoOn = !_isVideoOn);
+  }
+
+  Future<void> _toggleScreenShare() async {
+    if (!_isScreenSharing) {
+      await _trtcCloud.startScreenCapture(
+        0,
+        TRTCVideoEncParam(
+          videoResolution: TRTCCloudDef.TRTC_VIDEO_RESOLUTION_640_360,
+          videoFps: 15,
+          videoBitrate: 550,
+        ),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Screen sharing started')));
+      }
+    } else {
+      await _trtcCloud.stopScreenCapture();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Screen sharing stopped')));
+      }
+    }
+    setState(() => _isScreenSharing = !_isScreenSharing);
+  }
+
+  Future<void> _endSession() async {
+    await _trtcCloud.exitRoom();
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  void dispose() {
+    _trtcCloud.exitRoom();
+    _trtcCloud.unRegisterListener(onListener);
+    TRTCCloud.destroySharedInstance();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.session.title),
@@ -30,7 +268,7 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
+              color: colorScheme.primaryContainer,
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(16),
                 bottomRight: Radius.circular(16),
@@ -41,10 +279,10 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundImage: NetworkImage(widget.session.tutorImage),
-                    ),
+                    // CircleAvatar(
+                    //   radius: 24,
+                    //   backgroundImage: NetworkImage(widget.session.tutorImage),
+                    // ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -113,55 +351,19 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
                 color: Colors.black87,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Stack(
-                children: [
-                  // Main video feed placeholder
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.videocam,
-                          size: 64,
-                          color: Colors.white.withOpacity(0.7),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Connecting to ${widget.session.platform}...',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              child:
+                  _isInitialized
+                      ? TRTCCloudVideoView(
+                        onViewCreated: (controller) async {
+                          var cameraPermission =
+                              await Permission.camera.request();
 
-                  // Participant thumbnails
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: Container(
-                      width: 120,
-                      height: 90,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[800],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'You',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                          if (cameraPermission.isGranted) {
+                            _trtcCloud.startLocalPreview(true, controller);
+                          }
+                        },
+                      )
+                      : const Center(child: CircularProgressIndicator()),
             ),
           ),
 
@@ -186,7 +388,7 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
                   icon: _isMicOn ? Icons.mic : Icons.mic_off,
                   label: 'Mic',
                   isActive: _isMicOn,
-                  onTap: () => setState(() => _isMicOn = !_isMicOn),
+                  onTap: _toggleMic,
                 ),
 
                 // Video toggle
@@ -194,19 +396,18 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
                   icon: _isVideoOn ? Icons.videocam : Icons.videocam_off,
                   label: 'Video',
                   isActive: _isVideoOn,
-                  onTap: () => setState(() => _isVideoOn = !_isVideoOn),
+                  onTap: _toggleVideo,
                 ),
 
                 // Screen share
                 _buildControlButton(
-                  icon: Icons.screen_share,
+                  icon:
+                      _isScreenSharing
+                          ? Icons.stop_screen_share
+                          : Icons.screen_share,
                   label: 'Share',
-                  isActive: false,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Screen sharing started')),
-                    );
-                  },
+                  isActive: _isScreenSharing,
+                  onTap: _toggleScreenShare,
                 ),
 
                 // Chat
@@ -241,12 +442,7 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context); // Close dialog
-                                    Navigator.pop(
-                                      context,
-                                    ); // Go back to sessions
-                                  },
+                                  onPressed: _endSession,
                                   child: const Text('End'),
                                 ),
                               ],
