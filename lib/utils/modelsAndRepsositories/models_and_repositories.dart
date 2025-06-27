@@ -20,6 +20,7 @@ class ApiResponse<T> {
   final bool success;
   final String message;
   final T? data;
+  final Map<String, dynamic>? metadata;
   final String? errorCode;
 
   ApiResponse({
@@ -27,6 +28,7 @@ class ApiResponse<T> {
     required this.message,
     this.data,
     this.errorCode,
+    this.metadata,
   });
 
   factory ApiResponse.fromJson(
@@ -70,6 +72,7 @@ class User {
   final DateTime? dateJoined;
   final DateTime? lastLogin;
   final String? userType;
+  final Map<String, dynamic>? notificationSettings; // Added field
 
   User({
     required this.id,
@@ -83,6 +86,7 @@ class User {
     this.dateJoined,
     this.lastLogin,
     this.userType,
+    this.notificationSettings, // Added to constructor
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -107,6 +111,8 @@ class User {
                 : DateTime.parse(json['last_login']))
             : null,
     userType: json['user_type'],
+    notificationSettings:
+        json['notification_settings'] as Map<String, dynamic>?, // Added
   );
 
   Map<String, dynamic> toJson() => {
@@ -121,6 +127,7 @@ class User {
     'date_joined': dateJoined?.toIso8601String(),
     'last_login': lastLogin?.toIso8601String(),
     'user_type': userType,
+    'notification_settings': notificationSettings,
   };
 
   String get fullName {
@@ -1557,6 +1564,130 @@ class TestQuestion {
 // 12. Repositories
 // =============================================
 
+class UserRepository {
+  final auth.FirebaseAuth _auth = auth.FirebaseAuth.instance;
+  final CollectionReference _usersCollection = FirebaseConfig.firestore
+      .collection('users');
+
+  Future<ApiResponse<User>> getUser(String userId) async {
+    try {
+      final doc = await _usersCollection.doc(userId).get();
+      if (!doc.exists) {
+        throw ApiError(message: 'User not found');
+      }
+      final user = User.fromJson({
+        ...doc.data() as Map<String, dynamic>,
+        'id': doc.id,
+      });
+      debugPrint('User fetched: ${user.fullName}, id: ${user.id}');
+      return ApiResponse(success: true, message: 'User retrieved', data: user);
+    } catch (e) {
+      debugPrint('Error fetching user: $e');
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  Future<ApiResponse<void>> updateUser(
+    String userId,
+    Map<String, dynamic> updates,
+  ) async {
+    try {
+      await _usersCollection.doc(userId).update(updates);
+      debugPrint('User updated: $userId, updates: $updates');
+      return ApiResponse(
+        success: true,
+        message: 'User updated successfully',
+        data: null,
+      );
+    } catch (e) {
+      debugPrint('Error updating user: $e');
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  Future<ApiResponse<void>> updatePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw ApiError(message: 'No user is signed in');
+      }
+      final credential = auth.EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+      debugPrint('Password updated for user: ${user.uid}');
+      return ApiResponse(
+        success: true,
+        message: 'Password updated successfully',
+        data: null,
+      );
+    } catch (e) {
+      debugPrint('Error updating password: $e');
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  Future<ApiResponse<void>> requestDataExport(String userId) async {
+    try {
+      // Placeholder: Implement backend function or Firestore trigger
+      debugPrint('Data export requested for user: $userId');
+      return ApiResponse(
+        success: true,
+        message: 'Data export requested',
+        data: null,
+      );
+    } catch (e) {
+      debugPrint('Error requesting data export: $e');
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  Future<ApiResponse<void>> pauseNotifications(
+    String userId,
+    Duration duration,
+  ) async {
+    try {
+      final pauseUntil = DateTime.now().add(duration);
+      await _usersCollection.doc(userId).update({
+        'notifications_paused_until': Timestamp.fromDate(pauseUntil),
+      });
+      debugPrint('Notifications paused for user: $userId until $pauseUntil');
+      return ApiResponse(
+        success: true,
+        message: 'Notifications paused',
+        data: null,
+      );
+    } catch (e) {
+      debugPrint('Error pausing notifications: $e');
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  Future<ApiResponse<void>> deactivateAccount(String userId) async {
+    try {
+      await _usersCollection.doc(userId).update({
+        'is_active': false,
+        'deactivated': true,
+        'deactivated_at': Timestamp.now(),
+      });
+      debugPrint('Account deactivated: $userId');
+      return ApiResponse(
+        success: true,
+        message: 'Account deactivated',
+        data: null,
+      );
+    } catch (e) {
+      debugPrint('Error deactivating account: $e');
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+}
+
 class AuthRepository {
   Future<ApiResponse<User>> login(LoginRequest request) async {
     try {
@@ -1696,6 +1827,7 @@ class AchievementsRepository {
           snapshot.docs
               .map((doc) => Achievement.fromJson({...doc.data(), 'id': doc.id}))
               .toList();
+      debugPrint('Useer achievements: $achievements');
 
       return ApiResponse<List<Achievement>>(
         success: true,
@@ -1746,42 +1878,92 @@ class AchievementsRepository {
       throw ApiError.fromFirebaseException(e);
     }
   }
+
+  Future<void> initializeDefaultBadges(
+    String userId,
+    List<Map<String, dynamic>> defaultBadges,
+  ) async {
+    try {
+      final batch = FirebaseConfig.firestore.batch();
+      final achievementsRef = FirebaseConfig.firestore
+          .collection('users')
+          .doc(userId)
+          .collection('achievements');
+
+      for (var badge in defaultBadges) {
+        final achievement = Achievement(
+          id: badge['id'],
+          title: badge['title'],
+          description: badge['description'],
+          icon: badge['icon'],
+          earned: false,
+          progress: 0.0,
+          points: badge['points'],
+        );
+        batch.set(achievementsRef.doc(badge['id']), achievement.toJson());
+      }
+
+      await batch.commit();
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
 }
 
 class LeaderboardRepository {
   Future<ApiResponse<List<LeaderboardUser>>> getLeaderboard({
     String filter = 'overall',
+    DocumentSnapshot? startAfter,
+    int limit = 10,
   }) async {
     try {
-      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+      Query query = FirebaseConfig.firestore
           .collection('leaderboard')
-          .orderBy('points', descending: true);
+          .orderBy('points', descending: true)
+          .limit(limit);
 
-      if (filter != 'overall') {
-        query = query.where('subject', isEqualTo: filter);
+      // Apply filter logic
+      if (filter == 'this month') {
+        final startOfMonth = DateTime(
+          DateTime.now().year,
+          DateTime.now().month,
+        );
+        query = query.where(
+          'lastActive',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+        );
+      } else if (filter == 'by subject') {
+        // Example: Filter by a specific subject; adjust as needed
+        query = query.where('subject', isEqualTo: 'Mathematics');
+      }
+
+      // Apply pagination
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
       }
 
       final snapshot = await query.get();
-      final currentUserId = FirebaseConfig.firebaseAuth.currentUser?.uid;
+      final users =
+          snapshot.docs
+              .map(
+                (doc) => LeaderboardUser.fromJson({
+                  ...doc.data() as Map<String, dynamic>,
+                  'id': doc.id,
+                }),
+              )
+              .toList();
 
-      final leaderboard =
-          snapshot.docs.asMap().entries.map((entry) {
-            final index = entry.key;
-            final doc = entry.value;
-            return LeaderboardUser.fromJson({
-              ...doc.data(),
-              'id': doc.id,
-              'position': index + 1,
-              'is_current_user': doc.id == currentUserId,
-            });
-          }).toList();
-
+      debugPrint('Leaderboard fetched: ${users.length} users, filter=$filter');
       return ApiResponse<List<LeaderboardUser>>(
         success: true,
         message: 'Leaderboard retrieved',
-        data: leaderboard,
+        data: users,
+        metadata: {
+          'lastDocument': snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        },
       );
     } catch (e) {
+      debugPrint('Error fetching leaderboard: $e');
       throw ApiError.fromFirebaseException(e);
     }
   }
@@ -1872,7 +2054,6 @@ class SessionRepository {
     }
   }
 
-  // Fixed: Corrected field name from 'userId' to 'user_id'
   Future<ApiResponse<List<Session>>> getPendingSessions(String userId) async {
     try {
       final snapshot =

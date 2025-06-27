@@ -35,10 +35,8 @@ class _HomePageState extends State<HomePage> {
           if (appProvider.isInitializing) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (appProvider.initializationError != null) {
-            return Center(
-              child: Text('Error: ${appProvider.initializationError}'),
-            );
+          if (appProvider.error != null) {
+            return Center(child: Text('Error: ${appProvider.error}'));
           }
           if (appProvider.currentUser == null) {
             return const Center(child: Text('Please log in'));

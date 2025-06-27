@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../../utils/providers/providers.dart';
 
 class LeaderboardPage extends StatefulWidget {
   const LeaderboardPage({super.key});
@@ -14,7 +17,7 @@ class _LeaderboardPageState extends State<LeaderboardPage>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  String selectedFilter = 'This Month';
+  String selectedFilter = 'overall';
   final List<String> filters = ['Overall', 'This Month', 'By Subject'];
 
   @override
@@ -40,6 +43,16 @@ class _LeaderboardPageState extends State<LeaderboardPage>
 
     _fadeController.forward();
     _slideController.forward();
+
+    // Load leaderboard data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<LeaderboardProvider>();
+      debugPrint(
+        'LeaderboardPage initState: Loading data with filter=$selectedFilter',
+      );
+      provider.loadTopPerformers(forceRefresh: true);
+      provider.loadLeaderboard(filter: selectedFilter, forceRefresh: true);
+    });
   }
 
   @override
@@ -79,345 +92,454 @@ class _LeaderboardPageState extends State<LeaderboardPage>
             opacity: _fadeAnimation,
             child: SlideTransition(
               position: _slideAnimation,
-              child: CustomScrollView(
-                slivers: [
-                  // Header Section
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
+              child: Consumer<LeaderboardProvider>(
+                builder: (context, provider, child) {
+                  debugPrint(
+                    'LeaderboardPage build: isLoading=${provider.isLoading}, '
+                    'topPerformers=${provider.topPerformers?.length ?? 0}, '
+                    'leaderboard=${provider.leaderboard?.length ?? 0}, '
+                    'hasMore=${provider.hasMore}, '
+                    'error=${provider.error}',
+                  );
+
+                  if (provider.isLoading &&
+                      (provider.leaderboard?.isEmpty ?? true)) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (provider.error != null) {
+                    return Center(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 24),
-
-                          // Filter Chips
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children:
-                                  filters
-                                      .map(
-                                        (filter) => Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 8,
-                                          ),
-                                          child: FilterChip(
-                                            label: Text(filter),
-                                            selected: selectedFilter == filter,
-                                            onSelected: (selected) {
-                                              if (selected) {
-                                                setState(() {
-                                                  selectedFilter = filter;
-                                                });
-                                              }
-                                            },
-                                            backgroundColor:
-                                                isDark
-                                                    ? Colors.grey[800]
-                                                    : Colors.grey[100],
-                                            selectedColor: theme.primaryColor
-                                                .withOpacity(0.2),
-                                            checkmarkColor: theme.primaryColor,
-                                            labelStyle: TextStyle(
-                                              color:
-                                                  selectedFilter == filter
-                                                      ? theme.primaryColor
-                                                      : (isDark
-                                                          ? Colors.grey[300]
-                                                          : Colors.grey[700]),
-                                              fontWeight:
-                                                  selectedFilter == filter
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
-                                            ),
-                                            side: BorderSide(
-                                              color:
-                                                  selectedFilter == filter
-                                                      ? theme.primaryColor
-                                                      : Colors.transparent,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Top 3 Podium
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Container(
-                        height: 400,
-                        decoration: BoxDecoration(
-                          color:
-                              isDark
-                                  ? Colors.grey[900]?.withOpacity(0.5)
-                                  : Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color:
-                                isDark ? Colors.grey[800]! : Colors.grey[200]!,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Stack(
-                          children: [
-                            // Background decoration
-                            Positioned(
-                              top: -50,
-                              right: -50,
-                              child: Container(
-                                width: 150,
-                                height: 150,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.amber.withOpacity(0.1),
-                                      Colors.orange.withOpacity(0.05),
-                                    ],
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.emoji_events,
-                                        color: Colors.amber,
-                                        size: 24,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Top Performers',
-                                        style: theme.textTheme.titleLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color:
-                                                  isDark
-                                                      ? Colors.white
-                                                      : const Color(0xFF1A1A2E),
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                  Expanded(
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceEvenly,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        _buildPodiumPosition(
-                                          context,
-                                          position: 2,
-                                          name: 'Michael Chen',
-                                          subject: 'Computer Science',
-                                          points: '2,450',
-                                          imageUrl:
-                                              'https://picsum.photos/200/200?random=16',
-                                          height: 140,
-                                        ),
-                                        _buildPodiumPosition(
-                                          context,
-                                          position: 1,
-                                          name: 'Sarah Johnson',
-                                          subject: 'Mathematics',
-                                          points: '3,120',
-                                          imageUrl:
-                                              'https://picsum.photos/200/200?random=10',
-                                          height: 180,
-                                          isFirst: true,
-                                        ),
-                                        _buildPodiumPosition(
-                                          context,
-                                          position: 3,
-                                          name: 'David Lee',
-                                          subject: 'Chemistry',
-                                          points: '2,210',
-                                          imageUrl:
-                                              'https://picsum.photos/200/200?random=13',
-                                          height: 120,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-                  // Leaderboard List
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 4,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Colors.blue, Colors.cyan],
-                              ),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
                           Text(
-                            'Full Rankings',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color:
-                                  isDark
-                                      ? Colors.white
-                                      : const Color(0xFF1A1A2E),
-                            ),
+                            'Error: ${provider.error}',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              provider.clearError();
+                              provider.loadTopPerformers(forceRefresh: true);
+                              provider.loadLeaderboard(
+                                filter: selectedFilter,
+                                forceRefresh: true,
+                              );
+                            },
+                            child: const Text('Retry'),
                           ),
                         ],
                       ),
-                    ),
-                  ),
+                    );
+                  }
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  final topPerformers = provider.topPerformers ?? [];
+                  final leaderboard = provider.leaderboard ?? [];
 
-                  // Leaderboard Items
-                  SliverList(
-                    delegate: SliverChildListDelegate([
-                      _buildModernLeaderboardItem(
-                        context,
-                        position: 4,
-                        name: 'Emily Rodriguez',
-                        subject: 'Economics',
-                        points: '1,980',
-                        imageUrl: 'https://picsum.photos/200/200?random=17',
-                      ),
-                      _buildModernLeaderboardItem(
-                        context,
-                        position: 5,
-                        name: 'Robert Wilson',
-                        subject: 'Physics',
-                        points: '1,870',
-                        imageUrl: 'https://picsum.photos/200/200?random=18',
-                      ),
-                      _buildModernLeaderboardItem(
-                        context,
-                        position: 6,
-                        name: 'Jennifer Adams',
-                        subject: 'English',
-                        points: '1,750',
-                        imageUrl: 'https://picsum.photos/200/200?random=19',
-                      ),
-                      _buildModernLeaderboardItem(
-                        context,
-                        position: 7,
-                        name: 'Alex Thompson',
-                        subject: 'Statistics',
-                        points: '1,620',
-                        imageUrl: 'https://picsum.photos/200/200?random=20',
-                      ),
-                      _buildModernLeaderboardItem(
-                        context,
-                        position: 8,
-                        name: 'John Doe',
-                        subject: 'Mathematics',
-                        points: '1,540',
-                        imageUrl: 'https://picsum.photos/200/200?random=2',
-                        isCurrentUser: true,
-                      ),
-                      _buildModernLeaderboardItem(
-                        context,
-                        position: 9,
-                        name: 'Maria Garcia',
-                        subject: 'Literature',
-                        points: '1,480',
-                        imageUrl: 'https://picsum.photos/200/200?random=21',
-                      ),
-                      _buildModernLeaderboardItem(
-                        context,
-                        position: 10,
-                        name: 'James Brown',
-                        subject: 'Computer Science',
-                        points: '1,420',
-                        imageUrl: 'https://picsum.photos/200/200?random=22',
-                      ),
-                    ]),
-                  ),
-
-                  // Load More Button
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Center(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                theme.primaryColor,
-                                theme.primaryColor.withOpacity(0.8),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: theme.primaryColor.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
+                  return CustomScrollView(
+                    slivers: [
+                      // Header Section
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 24),
+                              // Filter Chips
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children:
+                                      filters
+                                          .map(
+                                            (filter) => Padding(
+                                              padding: const EdgeInsets.only(
+                                                right: 8,
+                                              ),
+                                              child: FilterChip(
+                                                label: Text(filter),
+                                                selected:
+                                                    selectedFilter == filter,
+                                                onSelected: (selected) {
+                                                  if (selected) {
+                                                    setState(() {
+                                                      selectedFilter = filter;
+                                                      final provider =
+                                                          context
+                                                              .read<
+                                                                LeaderboardProvider
+                                                              >();
+                                                      provider.loadLeaderboard(
+                                                        filter:
+                                                            filter
+                                                                .toLowerCase(),
+                                                        forceRefresh: true,
+                                                      );
+                                                    });
+                                                  }
+                                                },
+                                                backgroundColor:
+                                                    isDark
+                                                        ? Colors.grey[800]
+                                                        : Colors.grey[100],
+                                                selectedColor: theme
+                                                    .primaryColor
+                                                    .withOpacity(0.2),
+                                                checkmarkColor:
+                                                    theme.primaryColor,
+                                                labelStyle: TextStyle(
+                                                  color:
+                                                      selectedFilter == filter
+                                                          ? theme.primaryColor
+                                                          : (isDark
+                                                              ? Colors.grey[300]
+                                                              : Colors
+                                                                  .grey[700]),
+                                                  fontWeight:
+                                                      selectedFilter == filter
+                                                          ? FontWeight.bold
+                                                          : FontWeight.normal,
+                                                ),
+                                                side: BorderSide(
+                                                  color:
+                                                      selectedFilter == filter
+                                                          ? theme.primaryColor
+                                                          : Colors.transparent,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                ),
                               ),
                             ],
                           ),
-                          child: ElevatedButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(
-                              Icons.expand_more,
-                              color: Colors.white,
+                        ),
+                      ),
+
+                      // Top 3 Podium
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Container(
+                            height: 400,
+                            decoration: BoxDecoration(
+                              color:
+                                  isDark
+                                      ? Colors.grey[900]?.withOpacity(0.5)
+                                      : Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color:
+                                    isDark
+                                        ? Colors.grey[800]!
+                                        : Colors.grey[200]!,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
                             ),
-                            label: const Text(
-                              'View Full Leaderboard',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                            child: Stack(
+                              children: [
+                                // Background decoration
+                                Positioned(
+                                  top: -50,
+                                  right: -50,
+                                  child: Container(
+                                    width: 150,
+                                    height: 150,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.amber.withOpacity(0.1),
+                                          Colors.orange.withOpacity(0.05),
+                                        ],
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.emoji_events,
+                                            color: Colors.amber,
+                                            size: 24,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Top Performers',
+                                            style: theme.textTheme.titleLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color:
+                                                      isDark
+                                                          ? Colors.white
+                                                          : const Color(
+                                                            0xFF1A1A2E,
+                                                          ),
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                      Expanded(
+                                        child:
+                                            topPerformers.isEmpty
+                                                ? Center(
+                                                  child: Text(
+                                                    'No top performers available',
+                                                    style: theme
+                                                        .textTheme
+                                                        .bodyLarge
+                                                        ?.copyWith(
+                                                          color:
+                                                              isDark
+                                                                  ? Colors
+                                                                      .grey[400]
+                                                                  : Colors
+                                                                      .grey[600],
+                                                        ),
+                                                  ),
+                                                )
+                                                : Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceEvenly,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.end,
+                                                  children: [
+                                                    if (topPerformers.length >
+                                                        1)
+                                                      _buildPodiumPosition(
+                                                        context,
+                                                        position: 2,
+                                                        name:
+                                                            topPerformers[1]
+                                                                .name,
+                                                        subject:
+                                                            topPerformers[1]
+                                                                .subject ??
+                                                            "",
+                                                        points:
+                                                            topPerformers[1]
+                                                                .points
+                                                                .toString(),
+                                                        imageUrl:
+                                                            topPerformers[1]
+                                                                .profilePicture ??
+                                                            'https://picsum.photos/200/200?random=16',
+                                                        height: 140,
+                                                      ),
+                                                    if (topPerformers
+                                                        .isNotEmpty)
+                                                      _buildPodiumPosition(
+                                                        context,
+                                                        position: 1,
+                                                        name:
+                                                            topPerformers[0]
+                                                                .name,
+                                                        subject:
+                                                            topPerformers[0]
+                                                                .subject ??
+                                                            '',
+                                                        points:
+                                                            topPerformers[0]
+                                                                .points
+                                                                .toString(),
+                                                        imageUrl:
+                                                            topPerformers[0]
+                                                                .profilePicture ??
+                                                            'https://picsum.photos/200/200?random=10',
+                                                        height: 180,
+                                                        isFirst: true,
+                                                      ),
+                                                    if (topPerformers.length >
+                                                        2)
+                                                      _buildPodiumPosition(
+                                                        context,
+                                                        position: 3,
+                                                        name:
+                                                            topPerformers[2]
+                                                                .name,
+                                                        subject:
+                                                            topPerformers[2]
+                                                                .subject ??
+                                                            '',
+                                                        points:
+                                                            topPerformers[2]
+                                                                .points
+                                                                .toString(),
+                                                        imageUrl:
+                                                            topPerformers[2]
+                                                                .profilePicture ??
+                                                            'https://picsum.photos/200/200?random=13',
+                                                        height: 120,
+                                                      ),
+                                                  ],
+                                                ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+                      // Leaderboard List
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 4,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Colors.blue, Colors.cyan],
+                                  ),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Full Rankings',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      isDark
+                                          ? Colors.white
+                                          : const Color(0xFF1A1A2E),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                      // Leaderboard Items
+                      leaderboard.isEmpty
+                          ? SliverToBoxAdapter(
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Text(
+                                  'No leaderboard data available',
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    color:
+                                        isDark
+                                            ? Colors.grey[400]
+                                            : Colors.grey[600],
+                                  ),
+                                ),
                               ),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 32,
-                                vertical: 16,
-                              ),
-                              shape: RoundedRectangleBorder(
+                          )
+                          : SliverList(
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              final user = leaderboard[index];
+                              final currentUserId =
+                                  context.read<AppProvider>().currentUser?.id;
+                              return _buildModernLeaderboardItem(
+                                context,
+                                position: index + 4, // Start from 4th place
+                                name: user.name,
+                                subject: user.subject ?? '',
+                                points: user.points.toString(),
+                                imageUrl:
+                                    user.profilePicture ??
+                                    'https://picsum.photos/200/200?random=${index + 4}',
+                                isCurrentUser: user.id == currentUserId,
+                              );
+                            }, childCount: leaderboard.length),
+                          ),
+
+                      // Load More Button
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Center(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    theme.primaryColor,
+                                    theme.primaryColor.withOpacity(0.8),
+                                  ],
+                                ),
                                 borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: theme.primaryColor.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton.icon(
+                                onPressed:
+                                    provider.hasMore
+                                        ? () {
+                                          debugPrint(
+                                            'Loading more leaderboard data, filter=$selectedFilter',
+                                          );
+                                          provider.loadLeaderboard(
+                                            filter:
+                                                selectedFilter.toLowerCase(),
+                                            forceRefresh: false,
+                                          );
+                                        }
+                                        : null,
+                                icon: const Icon(
+                                  Icons.expand_more,
+                                  color: Colors.white,
+                                ),
+                                label: const Text(
+                                  'View Full Leaderboard',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 32,
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
             ),
           ),

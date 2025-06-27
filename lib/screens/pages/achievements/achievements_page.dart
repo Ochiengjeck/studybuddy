@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../utils/providers/providers.dart';
 
 class AchievementsScreen extends StatefulWidget {
   const AchievementsScreen({super.key});
@@ -13,6 +16,74 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  // Define default badges
+  final List<Map<String, dynamic>> _defaultBadges = [
+    {
+      'id': 'fast_learner',
+      'title': 'Fast Learner',
+      'description': 'Complete 5 sessions in your first month',
+      'icon': 'rocket_launch',
+      'points': 100,
+      'gradient': [Colors.orange, Colors.deepOrange],
+    },
+    {
+      'id': 'five_star_student',
+      'title': '5-Star Student',
+      'description': 'Receive 5 perfect ratings',
+      'icon': 'star',
+      'points': 150,
+      'gradient': [Colors.amber, Colors.yellow],
+    },
+    {
+      'id': 'bookworm',
+      'title': 'Bookworm',
+      'description': 'Complete 10 study sessions',
+      'icon': 'book',
+      'points': 120,
+      'gradient': [Colors.green, Colors.lightGreen],
+    },
+    {
+      'id': 'active_participant',
+      'title': 'Active Participant',
+      'description': 'Send 50 messages',
+      'icon': 'forum',
+      'points': 80,
+      'gradient': [Colors.blue, Colors.lightBlue],
+    },
+    {
+      'id': 'master_tutor',
+      'title': 'Master Tutor',
+      'description': 'Complete 50 sessions',
+      'icon': 'workspace_premium',
+      'points': 200,
+      'gradient': [Colors.purple, Colors.deepPurple],
+    },
+    {
+      'id': 'subject_expert',
+      'title': 'Subject Expert',
+      'description': 'Master 3 subjects',
+      'icon': 'lightbulb',
+      'points': 180,
+      'gradient': [Colors.indigo, Colors.blue],
+    },
+    {
+      'id': 'top_performer',
+      'title': 'Top Performer',
+      'description': 'Reach top 10 on leaderboard',
+      'icon': 'emoji_events',
+      'points': 250,
+      'gradient': [Colors.teal, Colors.cyan],
+    },
+    {
+      'id': 'mentor',
+      'title': 'Mentor',
+      'description': 'Help 5 other students',
+      'icon': 'school',
+      'points': 130,
+      'gradient': [Colors.pink, Colors.red],
+    },
+  ];
 
   @override
   void initState() {
@@ -37,6 +108,30 @@ class _AchievementsScreenState extends State<AchievementsScreen>
 
     _fadeController.forward();
     _slideController.forward();
+
+    // Load data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = context.read<AppProvider>().currentUser?.id;
+      debugPrint('AchievementsScreen initState: userId=$userId');
+      if (userId != null) {
+        final provider = context.read<AchievementsProvider>();
+        provider.loadUserStats(userId, forceRefresh: true);
+        provider.loadAchievements(userId, forceRefresh: true).then((_) {
+          debugPrint(
+            'Achievements loaded in initState: ${provider.achievements?.length}',
+          );
+          if (provider.achievements == null || provider.achievements!.isEmpty) {
+            debugPrint('Initializing default badges for userId=$userId');
+            provider.initializeDefaultBadges(userId, _defaultBadges).then((_) {
+              debugPrint('Default badges initialized, reloading achievements');
+              provider.loadAchievements(userId, forceRefresh: true);
+            });
+          }
+        });
+      } else {
+        debugPrint('No userId found, cannot load achievements');
+      }
+    });
   }
 
   @override
@@ -46,409 +141,476 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     super.dispose();
   }
 
+  // Map string icons to IconData
+  IconData _getIconData(String iconName) {
+    const iconMap = {
+      'emoji_events': Icons.emoji_events,
+      'rocket_launch': Icons.rocket_launch,
+      'star': Icons.star,
+      'book': Icons.book,
+      'forum': Icons.forum,
+      'workspace_premium': Icons.workspace_premium,
+      'lightbulb': Icons.lightbulb,
+      'school': Icons.school,
+    };
+    return iconMap[iconName] ?? Icons.emoji_events;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final appProvider = context.watch<AppProvider>();
 
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors:
-                isDark
-                    ? [
-                      const Color(0xFF0F0F23),
-                      const Color(0xFF1A1A2E),
-                      const Color(0xFF16213E),
-                    ]
-                    : [
-                      const Color(0xFFF8FAFF),
-                      const Color(0xFFE8F2FF),
-                      const Color(0xFFF0F8FF),
-                    ],
-          ),
-        ),
-        child: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      theme.primaryColor,
-                                      theme.primaryColor.withOpacity(0.7),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: theme.primaryColor.withOpacity(
-                                        0.3,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  Icons.emoji_events,
-                                  color: Colors.white,
-                                  size: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Your Mpilestones',
-                                      style: theme.textTheme.headlineMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color:
-                                                isDark
-                                                    ? Colors.white
-                                                    : const Color(0xFF1A1A2E),
-                                          ),
-                                    ),
-                                    Text(
-                                      'Your learning milestones',
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color:
-                                                isDark
-                                                    ? Colors.grey[400]
-                                                    : Colors.grey[600],
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          // Stats Cards
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildStatCard(
-                                  context,
-                                  'Earned',
-                                  '4',
-                                  Icons.star,
-                                  Colors.amber,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildStatCard(
-                                  context,
-                                  'In Progress',
-                                  '4',
-                                  Icons.trending_up,
-                                  Colors.blue,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildStatCard(
-                                  context,
-                                  'Total Points',
-                                  '1,540',
-                                  Icons.diamond,
-                                  Colors.purple,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+    if (appProvider.currentUser == null) {
+      debugPrint('No user logged in');
+      return const Scaffold(
+        body: Center(child: Text('Please sign in to view achievements')),
+      );
+    }
+
+    return Consumer<AchievementsProvider>(
+      builder: (context, provider, child) {
+        debugPrint(
+          'AchievementsScreen build: isLoading=${provider.isLoading}, '
+          'achievements=${provider.achievements?.length ?? 0}, '
+          'error=${provider.error}',
+        );
+
+        if (provider.isLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (provider.error != null) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Error: ${provider.error}',
+                    style: theme.textTheme.titleMedium,
                   ),
-
-                  // Earned Badges Section
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 4,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [Colors.amber, Colors.orange],
-                                  ),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Earned Badges',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color:
-                                      isDark
-                                          ? Colors.white
-                                          : const Color(0xFF1A1A2E),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Earned Badges Grid
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: _getCrossAxisCount(context),
-                        childAspectRatio: 1.1,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                      ),
-                      delegate: SliverChildListDelegate([
-                        _buildModernAchievementBadge(
-                          context,
-                          icon: Icons.rocket_launch,
-                          title: 'Fast Learner',
-                          description:
-                              'Complete 5 sessions in your first month',
-                          earned: true,
-                          progress: 1.0,
-                          gradient: [Colors.orange, Colors.deepOrange],
-                        ),
-                        _buildModernAchievementBadge(
-                          context,
-                          icon: Icons.star,
-                          title: '5-Star Student',
-                          description: 'Receive 5 perfect ratings',
-                          earned: true,
-                          progress: 0.6,
-                          gradient: [Colors.amber, Colors.yellow],
-                        ),
-                        _buildModernAchievementBadge(
-                          context,
-                          icon: Icons.book,
-                          title: 'Bookworm',
-                          description: 'Complete 10 study sessions',
-                          earned: true,
-                          progress: 0.8,
-                          gradient: [Colors.green, Colors.lightGreen],
-                        ),
-                        _buildModernAchievementBadge(
-                          context,
-                          icon: Icons.forum,
-                          title: 'Active Participant',
-                          description: 'Send 50 messages',
-                          earned: true,
-                          progress: 0.45,
-                          gradient: [Colors.blue, Colors.lightBlue],
-                        ),
-                      ]),
-                    ),
-                  ),
-
-                  // Next Badges Section
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 4,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Colors.purple, Colors.deepPurple],
-                              ),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Next Badges',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color:
-                                  isDark
-                                      ? Colors.white
-                                      : const Color(0xFF1A1A2E),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Next Badges Grid
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: _getCrossAxisCount(context),
-                        childAspectRatio: .9,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                      ),
-                      delegate: SliverChildListDelegate([
-                        _buildModernAchievementBadge(
-                          context,
-                          icon: Icons.workspace_premium,
-                          title: 'Master Tutor',
-                          description: 'Complete 50 sessions',
-                          earned: false,
-                          progress: 0.24,
-                          gradient: [Colors.purple, Colors.deepPurple],
-                        ),
-                        _buildModernAchievementBadge(
-                          context,
-                          icon: Icons.lightbulb,
-                          title: 'Subject Expert',
-                          description: 'Master 3 subjects',
-                          earned: false,
-                          progress: 0.66,
-                          gradient: [Colors.indigo, Colors.blue],
-                        ),
-                        _buildModernAchievementBadge(
-                          context,
-                          icon: Icons.emoji_events,
-                          title: 'Top Performer',
-                          description: 'Reach top 10 on leaderboard',
-                          earned: false,
-                          progress: 0.3,
-                          gradient: [Colors.teal, Colors.cyan],
-                        ),
-                        _buildModernAchievementBadge(
-                          context,
-                          icon: Icons.school,
-                          title: 'Mentor',
-                          description: 'Help 5 other students',
-                          earned: false,
-                          progress: 0.2,
-                          gradient: [Colors.pink, Colors.red],
-                        ),
-                      ]),
-                    ),
-                  ),
-
-                  // Progress Chart
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 4,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [Colors.blue, Colors.cyan],
-                                  ),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Progress Overview',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color:
-                                      isDark
-                                          ? Colors.white
-                                          : const Color(0xFF1A1A2E),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            height: 300,
-                            decoration: BoxDecoration(
-                              color:
-                                  isDark
-                                      ? Colors.grey[900]?.withOpacity(0.5)
-                                      : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color:
-                                    isDark
-                                        ? Colors.grey[800]!
-                                        : Colors.grey[200]!,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.analytics,
-                                    size: 48,
-                                    color: theme.primaryColor,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Progress Chart',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Visual representation of your learning journey',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: Colors.grey,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      provider.clearError();
+                      final userId =
+                          context.read<AppProvider>().currentUser?.id;
+                      if (userId != null) {
+                        provider.loadUserStats(userId, forceRefresh: true);
+                        provider
+                            .loadAchievements(userId, forceRefresh: true)
+                            .then((_) {
+                              if (provider.achievements == null ||
+                                  provider.achievements!.isEmpty) {
+                                provider
+                                    .initializeDefaultBadges(
+                                      userId,
+                                      _defaultBadges,
+                                    )
+                                    .then((_) {
+                                      provider.loadAchievements(
+                                        userId,
+                                        forceRefresh: true,
+                                      );
+                                    });
+                              }
+                            });
+                      }
+                    },
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
             ),
+          );
+        }
+
+        final userStats = provider.userStats;
+        final achievements = provider.achievements ?? [];
+        final earnedBadges = achievements.where((a) => a.earned).toList();
+        final nextBadges = achievements.where((a) => !a.earned).toList();
+        debugPrint(
+          'Earned Badges: ${earnedBadges.length}, Next Badges: ${nextBadges.length}',
+        );
+
+        return Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors:
+                    isDark
+                        ? [
+                          const Color(0xFF0F0F23),
+                          const Color(0xFF1A1A2E),
+                          const Color(0xFF16213E),
+                        ]
+                        : [
+                          const Color(0xFFF8FAFF),
+                          const Color(0xFFE8F2FF),
+                          const Color(0xFFF0F8FF),
+                        ],
+              ),
+            ),
+            child: SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          theme.primaryColor,
+                                          theme.primaryColor.withOpacity(0.7),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: theme.primaryColor.withOpacity(
+                                            0.3,
+                                          ),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.emoji_events,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Your Milestones',
+                                          style: theme.textTheme.headlineMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color:
+                                                    isDark
+                                                        ? Colors.white
+                                                        : const Color(
+                                                          0xFF1A1A2E,
+                                                        ),
+                                              ),
+                                        ),
+                                        Text(
+                                          'Your learning milestones',
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                color:
+                                                    isDark
+                                                        ? Colors.grey[400]
+                                                        : Colors.grey[600],
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              // Stats Cards
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildStatCard(
+                                      context,
+                                      'Earned',
+                                      userStats?.badgesEarned.toString() ?? '0',
+                                      Icons.star,
+                                      Colors.amber,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildStatCard(
+                                      context,
+                                      'In Progress',
+                                      nextBadges.length.toString(),
+                                      Icons.trending_up,
+                                      Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildStatCard(
+                                      context,
+                                      'Total Points',
+                                      userStats?.pointsEarned.toString() ?? '0',
+                                      Icons.diamond,
+                                      Colors.purple,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Earned Badges Section
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Colors.amber, Colors.orange],
+                                      ),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Earned Badges',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          isDark
+                                              ? Colors.white
+                                              : const Color(0xFF1A1A2E),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              if (earnedBadges.isEmpty)
+                                Center(
+                                  child: Text(
+                                    'No badges earned yet',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color:
+                                          isDark
+                                              ? Colors.grey[400]
+                                              : Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Earned Badges Grid
+                      if (earnedBadges.isNotEmpty)
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: _getCrossAxisCount(context),
+                                  childAspectRatio: 1.1,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                ),
+                            delegate: SliverChildListDelegate(
+                              earnedBadges
+                                  .map(
+                                    (badge) => _buildModernAchievementBadge(
+                                      context,
+                                      icon: _getIconData(badge.icon),
+                                      title: badge.title,
+                                      description: badge.description,
+                                      earned: badge.earned,
+                                      progress: badge.progress,
+                                      gradient: _getGradientForBadge(
+                                        badge.icon,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+
+                      // Next Badges Section
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 4,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Colors.purple, Colors.deepPurple],
+                                  ),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Next Badges',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      isDark
+                                          ? Colors.white
+                                          : const Color(0xFF1A1A2E),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Next Badges Grid
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: _getCrossAxisCount(context),
+                                childAspectRatio: 0.9,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                              ),
+                          delegate: SliverChildListDelegate(
+                            nextBadges
+                                .map(
+                                  (badge) => _buildModernAchievementBadge(
+                                    context,
+                                    icon: _getIconData(badge.icon),
+                                    title: badge.title,
+                                    description: badge.description,
+                                    earned: badge.earned,
+                                    progress: badge.progress,
+                                    gradient: _getGradientForBadge(badge.icon),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                      ),
+
+                      // Progress Chart
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Colors.blue, Colors.cyan],
+                                      ),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Progress Overview',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          isDark
+                                              ? Colors.white
+                                              : const Color(0xFF1A1A2E),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Container(
+                                height: 300,
+                                decoration: BoxDecoration(
+                                  color:
+                                      isDark
+                                          ? Colors.grey[900]?.withOpacity(0.5)
+                                          : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color:
+                                        isDark
+                                            ? Colors.grey[800]!
+                                            : Colors.grey[200]!,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.analytics,
+                                        size: 48,
+                                        color: theme.primaryColor,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'Progress Chart',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Visual representation of your learning journey',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(color: Colors.grey),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -458,6 +620,20 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     if (width > 800) return 3;
     if (width > 600) return 2;
     return 2;
+  }
+
+  List<Color> _getGradientForBadge(String icon) {
+    const gradientMap = {
+      'rocket_launch': [Colors.orange, Colors.deepOrange],
+      'star': [Colors.amber, Colors.yellow],
+      'book': [Colors.green, Colors.lightGreen],
+      'forum': [Colors.blue, Colors.lightBlue],
+      'workspace_premium': [Colors.purple, Colors.deepPurple],
+      'lightbulb': [Colors.indigo, Colors.blue],
+      'emoji_events': [Colors.teal, Colors.cyan],
+      'school': [Colors.pink, Colors.red],
+    };
+    return gradientMap[icon] ?? [Colors.grey, Colors.grey[700]!];
   }
 
   Widget _buildStatCard(

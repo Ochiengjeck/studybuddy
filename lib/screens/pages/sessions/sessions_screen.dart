@@ -87,7 +87,14 @@ class _SessionsScreenState extends State<SessionsScreen>
 
   Widget _buildSessionList(List<Session>? sessions) {
     if (sessions == null || sessions.isEmpty) {
-      return const Center(child: Text('No sessions found'));
+      return Center(
+        child: Column(
+          children: [
+            Image.asset('assets/no_session.png', height: 150),
+            Text('No sessions found'),
+          ],
+        ),
+      );
     }
 
     return SingleChildScrollView(
@@ -97,18 +104,21 @@ class _SessionsScreenState extends State<SessionsScreen>
             sessions.map((session) {
               return GestureDetector(
                 onTap: () => _navigateToSessionScreen(session),
-                child: SessionCard(
-                  title: session.title,
-                  status: session.statusText,
-                  statusColor: session.statusColor,
-                  dateTime: session.formattedDateTime,
-                  duration: session.formattedDuration,
-                  tutorName: session.tutorName,
-                  tutorImage: session.tutorImage,
-                  platform: session.platform,
-                  description: session.description,
-                  participants: session.participantImages,
-                  showActions: true,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: SessionCard(
+                    title: session.title,
+                    status: session.statusText,
+                    statusColor: session.statusColor,
+                    dateTime: session.formattedDateTime,
+                    duration: session.formattedDuration,
+                    tutorName: session.tutorName,
+                    tutorImage: session.tutorImage,
+                    platform: session.platform,
+                    description: session.description,
+                    participants: session.participantImages,
+                    showActions: true,
+                  ),
                 ),
               );
             }).toList(),

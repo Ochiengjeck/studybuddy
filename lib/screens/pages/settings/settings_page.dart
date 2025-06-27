@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
+import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../../../utils/providers/providers.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -13,24 +18,17 @@ class _SettingsPageState extends State<SettingsPage>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // Controllers for form fields
-  final _nameController = TextEditingController(text: 'John Doe');
-  final _emailController = TextEditingController(text: 'john.doe@example.com');
-  final _phoneController = TextEditingController(text: '+1 (555) 123-4567');
-  final _locationController = TextEditingController(text: 'San Francisco, CA');
-  final _bioController = TextEditingController(
-    text:
-        'Computer Science major at University of California, specializing in artificial intelligence and data structures.',
-  );
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
+  late TextEditingController _phoneController;
+  late TextEditingController _currentPasswordController;
+  late TextEditingController _newPasswordController;
+  late TextEditingController _confirmPasswordController;
 
-  // Password controllers
-  final _currentPasswordController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-
-  // Edit mode states
-  bool _isEditingAccount = false;
-  bool _isEditingSecurity = false;
+  bool _isEditingProfile = false;
+  bool _isChangingPassword = false;
+  String? _errorMessage;
 
   // Notification preferences
   Map<String, bool> notificationSettings = {
@@ -59,24 +57,189 @@ class _SettingsPageState extends State<SettingsPage>
       CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
     );
     _animationController.forward();
+
+    final user = context.read<AppProvider>().currentUser;
+    _firstNameController = TextEditingController(text: user?.firstName ?? '');
+    _lastNameController = TextEditingController(text: user?.lastName ?? '');
+    _phoneController = TextEditingController(text: user?.phone ?? '');
+    _currentPasswordController = TextEditingController();
+    _newPasswordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
+
+    _loadUserData();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
-    _nameController.dispose();
-    _emailController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _phoneController.dispose();
-    _locationController.dispose();
-    _bioController.dispose();
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
+  Future<void> _loadUserData() async {
+    final appProvider = context.read<AppProvider>();
+    final userId = appProvider.currentUser?.id;
+    if (userId != null) {
+      try {
+        final response = await UserRepository().getUser(userId);
+        if (response.success && response.data != null) {
+          appProvider.setCurrentUser(response.data);
+          setState(() {
+            _firstNameController.text = response.data!.firstName ?? '';
+            _lastNameController.text = response.data!.lastName ?? '';
+            _phoneController.text = response.data!.phone ?? '';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _updateProfile() async {
+    if (_formKey.currentState!.validate()) {
+      final appProvider = context.read<AppProvider>();
+      final userId = appProvider.currentUser?.id;
+      if (userId != null) {
+        try {
+          final updates = {
+            'first_name': _firstNameController.text.trim(),
+            'last_name': _lastNameController.text.trim(),
+            'phone': _phoneController.text.trim(),
+          };
+          final response = await UserRepository().updateUser(userId, updates);
+          if (response.success) {
+            final updatedUser = appProvider.currentUser!.copyWith(
+              firstName: _firstNameController.text.trim(),
+              lastName: _lastNameController.text.trim(),
+              phone: _phoneController.text.trim(),
+            );
+            appProvider.setCurrentUser(updatedUser);
+            setState(() {
+              _isEditingProfile = false;
+              _errorMessage = null;
+            });
+            _showSuccessSnackBar('Profile updated successfully');
+          }
+        } catch (e) {
+          setState(() {
+            _errorMessage = e.toString();
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _changePassword() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        final response = await UserRepository().updatePassword(
+          _currentPasswordController.text,
+          _newPasswordController.text,
+        );
+        if (response.success) {
+          setState(() {
+            _isChangingPassword = false;
+            _currentPasswordController.clear();
+            _newPasswordController.clear();
+            _confirmPasswordController.clear();
+            _errorMessage = null;
+          });
+          _showSuccessSnackBar('Password changed successfully');
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _pauseNotifications(Duration duration) async {
+    final userId = context.read<AppProvider>().currentUser?.id;
+    if (userId != null) {
+      try {
+        final response = await UserRepository().pauseNotifications(
+          userId,
+          duration,
+        );
+        if (response.success) {
+          _showSuccessSnackBar(
+            'Notifications paused for ${duration.inHours} hours',
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _deactivateAccount() async {
+    final userId = context.read<AppProvider>().currentUser?.id;
+    if (userId != null) {
+      try {
+        final response = await UserRepository().deactivateAccount(userId);
+        if (response.success) {
+          context.read<AuthProvider>().logout();
+          _showSuccessSnackBar('Account deactivated successfully');
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _requestDataExport() async {
+    final userId = context.read<AppProvider>().currentUser?.id;
+    if (userId != null) {
+      try {
+        final response = await UserRepository().requestDataExport(userId);
+        if (response.success) {
+          _showSuccessSnackBar('Data export request sent');
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Text(message),
+          ],
+        ),
+        backgroundColor: Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final appProvider = context.watch<AppProvider>();
+    final user = appProvider.currentUser;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: FadeTransition(
@@ -93,18 +256,24 @@ class _SettingsPageState extends State<SettingsPage>
                   child: Column(
                     children: [
                       _buildModernTextField(
-                        controller: _nameController,
-                        label: 'Full Name',
+                        controller: _firstNameController,
+                        label: 'First Name',
                         icon: Icons.person,
-                        enabled: _isEditingAccount,
+                        enabled: _isEditingProfile,
                       ),
                       const SizedBox(height: 16),
                       _buildModernTextField(
-                        controller: _emailController,
+                        controller: _lastNameController,
+                        label: 'Last Name',
+                        icon: Icons.person_outline,
+                        enabled: _isEditingProfile,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildModernTextField(
                         label: 'Email',
                         icon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        enabled: _isEditingAccount,
+                        enabled: false,
+                        initialValue: user?.email ?? '',
                       ),
                       const SizedBox(height: 16),
                       _buildModernTextField(
@@ -112,34 +281,19 @@ class _SettingsPageState extends State<SettingsPage>
                         label: 'Phone Number',
                         icon: Icons.phone_outlined,
                         keyboardType: TextInputType.phone,
-                        enabled: _isEditingAccount,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildModernTextField(
-                        controller: _locationController,
-                        label: 'Location',
-                        icon: Icons.location_on_outlined,
-                        enabled: _isEditingAccount,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildModernTextField(
-                        controller: _bioController,
-                        label: 'Bio',
-                        icon: Icons.info_outline,
-                        maxLines: 4,
-                        enabled: _isEditingAccount,
+                        enabled: _isEditingProfile,
                       ),
                       const SizedBox(height: 24),
                       Row(
                         children: [
-                          if (!_isEditingAccount) ...[
+                          if (!_isEditingProfile) ...[
                             Expanded(
                               child: _buildActionButton(
                                 text: 'Edit Information',
                                 icon: Icons.edit_outlined,
                                 onPressed:
                                     () => setState(
-                                      () => _isEditingAccount = true,
+                                      () => _isEditingProfile = true,
                                     ),
                                 isPrimary: false,
                               ),
@@ -149,7 +303,16 @@ class _SettingsPageState extends State<SettingsPage>
                               child: _buildActionButton(
                                 text: 'Cancel',
                                 icon: Icons.close,
-                                onPressed: () => _cancelAccountEdit(),
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditingProfile = false;
+                                    _firstNameController.text =
+                                        user?.firstName ?? '';
+                                    _lastNameController.text =
+                                        user?.lastName ?? '';
+                                    _phoneController.text = user?.phone ?? '';
+                                  });
+                                },
                                 isPrimary: false,
                               ),
                             ),
@@ -158,7 +321,7 @@ class _SettingsPageState extends State<SettingsPage>
                               child: _buildActionButton(
                                 text: 'Save Changes',
                                 icon: Icons.save_outlined,
-                                onPressed: () => _saveAccountChanges(context),
+                                onPressed: _updateProfile,
                                 isPrimary: true,
                               ),
                             ),
@@ -177,7 +340,7 @@ class _SettingsPageState extends State<SettingsPage>
                   icon: Icons.security_outlined,
                   child: Column(
                     children: [
-                      if (!_isEditingSecurity) ...[
+                      if (!_isChangingPassword) ...[
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(20),
@@ -217,7 +380,7 @@ class _SettingsPageState extends State<SettingsPage>
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Last updated: 2 months ago',
+                                'Last updated: ${DateFormat('MMMM d, y').format(DateTime.now())}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[500],
@@ -231,7 +394,7 @@ class _SettingsPageState extends State<SettingsPage>
                           text: 'Change Password',
                           icon: Icons.security,
                           onPressed:
-                              () => setState(() => _isEditingSecurity = true),
+                              () => setState(() => _isChangingPassword = true),
                           isPrimary: false,
                         ),
                       ] else ...[
@@ -265,7 +428,14 @@ class _SettingsPageState extends State<SettingsPage>
                               child: _buildActionButton(
                                 text: 'Cancel',
                                 icon: Icons.close,
-                                onPressed: () => _cancelSecurityEdit(),
+                                onPressed: () {
+                                  setState(() {
+                                    _isChangingPassword = false;
+                                    _currentPasswordController.clear();
+                                    _newPasswordController.clear();
+                                    _confirmPasswordController.clear();
+                                  });
+                                },
                                 isPrimary: false,
                               ),
                             ),
@@ -274,7 +444,7 @@ class _SettingsPageState extends State<SettingsPage>
                               child: _buildActionButton(
                                 text: 'Update Password',
                                 icon: Icons.security,
-                                onPressed: () => _updatePassword(context),
+                                onPressed: _changePassword,
                                 isPrimary: true,
                               ),
                             ),
@@ -333,7 +503,10 @@ class _SettingsPageState extends State<SettingsPage>
                       _buildActionButton(
                         text: 'Save Preferences',
                         icon: Icons.check_circle_outline,
-                        onPressed: () => _showPreferencesSaved(context),
+                        onPressed:
+                            () => _showSuccessSnackBar(
+                              'Notification preferences saved',
+                            ),
                         isPrimary: true,
                       ),
                     ],
@@ -353,7 +526,7 @@ class _SettingsPageState extends State<SettingsPage>
                         'Download a copy of your account data',
                         Icons.download_outlined,
                         Colors.blue,
-                        () => _showExportDialog(context),
+                        _requestDataExport,
                       ),
                       const SizedBox(height: 12),
                       _buildActionTile(
@@ -361,7 +534,7 @@ class _SettingsPageState extends State<SettingsPage>
                         'Temporarily disable all notifications',
                         Icons.pause_circle_outline,
                         Colors.orange,
-                        () => _showPauseDialog(context),
+                        () => _pauseNotifications(const Duration(hours: 24)),
                       ),
                       const SizedBox(height: 12),
                       _buildActionTile(
@@ -369,7 +542,7 @@ class _SettingsPageState extends State<SettingsPage>
                         'Temporarily disable your account',
                         Icons.person_off_outlined,
                         Colors.red,
-                        () => _showDeactivateDialog(context),
+                        _deactivateAccount,
                       ),
                     ],
                   ),
@@ -443,6 +616,7 @@ class _SettingsPageState extends State<SettingsPage>
     int maxLines = 1,
     TextInputType? keyboardType,
     bool enabled = true,
+    String? initialValue,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -452,33 +626,49 @@ class _SettingsPageState extends State<SettingsPage>
           color: enabled ? Colors.grey[200]! : Colors.grey[300]!,
         ),
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        enabled: enabled,
-        style: TextStyle(
-          color: enabled ? Colors.grey[800] : Colors.grey[600],
-          fontSize: 16,
-        ),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(
-            color: enabled ? Colors.grey[600] : Colors.grey[500],
-          ),
-          prefixIcon: Icon(
-            icon,
-            color: enabled ? Colors.grey[600] : Colors.grey[500],
-          ),
-          suffixIcon:
-              !enabled
-                  ? Icon(Icons.lock_outline, color: Colors.grey[400], size: 18)
-                  : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.all(20),
-        ),
-      ),
+      child:
+          initialValue != null
+              ? Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  initialValue,
+                  style: TextStyle(
+                    color: enabled ? Colors.grey[800] : Colors.grey[600],
+                    fontSize: 16,
+                  ),
+                ),
+              )
+              : TextField(
+                controller: controller,
+                obscureText: obscureText,
+                maxLines: maxLines,
+                keyboardType: keyboardType,
+                enabled: enabled,
+                style: TextStyle(
+                  color: enabled ? Colors.grey[800] : Colors.grey[600],
+                  fontSize: 16,
+                ),
+                decoration: InputDecoration(
+                  labelText: label,
+                  labelStyle: TextStyle(
+                    color: enabled ? Colors.grey[600] : Colors.grey[500],
+                  ),
+                  prefixIcon: Icon(
+                    icon,
+                    color: enabled ? Colors.grey[600] : Colors.grey[500],
+                  ),
+                  suffixIcon:
+                      !enabled
+                          ? Icon(
+                            Icons.lock_outline,
+                            color: Colors.grey[400],
+                            size: 18,
+                          )
+                          : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.all(20),
+                ),
+              ),
     );
   }
 
@@ -636,238 +826,6 @@ class _SettingsPageState extends State<SettingsPage>
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  // Edit mode handling methods
-  void _cancelAccountEdit() {
-    setState(() {
-      _isEditingAccount = false;
-      // Reset controllers to original values
-      _nameController.text = 'John Doe';
-      _emailController.text = 'john.doe@example.com';
-      _phoneController.text = '+1 (555) 123-4567';
-      _locationController.text = 'San Francisco, CA';
-      _bioController.text =
-          'Computer Science major at University of California, specializing in artificial intelligence and data structures.';
-    });
-  }
-
-  void _saveAccountChanges(BuildContext context) {
-    setState(() {
-      _isEditingAccount = false;
-    });
-    _showSuccessSnackBar(context, 'Account information saved successfully!');
-  }
-
-  void _cancelSecurityEdit() {
-    setState(() {
-      _isEditingSecurity = false;
-      _currentPasswordController.clear();
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
-    });
-  }
-
-  void _updatePassword(BuildContext context) {
-    // Basic validation
-    if (_currentPasswordController.text.isEmpty ||
-        _newPasswordController.text.isEmpty ||
-        _confirmPasswordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.error, color: Colors.white),
-              SizedBox(width: 8),
-              Text('Please fill in all password fields'),
-            ],
-          ),
-          backgroundColor: Colors.red.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (_newPasswordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.error, color: Colors.white),
-              SizedBox(width: 8),
-              Text('New passwords do not match'),
-            ],
-          ),
-          backgroundColor: Colors.red.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-      return;
-    }
-
-    // If validation passes
-    setState(() {
-      _isEditingSecurity = false;
-      _currentPasswordController.clear();
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
-    });
-    _showSuccessSnackBar(context, 'Password updated successfully!');
-  }
-
-  // Existing dialog methods
-  void _showPreferencesSaved(BuildContext context) {
-    _showSuccessSnackBar(context, 'Notification preferences saved!');
-  }
-
-  void _showExportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Row(
-              children: [
-                Icon(Icons.download, color: Colors.blue),
-                SizedBox(width: 8),
-                Text('Export Data'),
-              ],
-            ),
-            content: const Text(
-              'Your data export will be sent to your email address within 24 hours.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showSuccessSnackBar(
-                    context,
-                    'Data export requested successfully!',
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Export'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _showPauseDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Row(
-              children: [
-                Icon(Icons.pause_circle, color: Colors.orange),
-                SizedBox(width: 8),
-                Text('Pause Notifications'),
-              ],
-            ),
-            content: const Text(
-              'How long would you like to pause notifications?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showSuccessSnackBar(
-                    context,
-                    'Notifications paused for 24 hours',
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange.shade600,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('24 Hours'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _showDeactivateDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Row(
-              children: [
-                Icon(Icons.warning, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Deactivate Account'),
-              ],
-            ),
-            content: const Text(
-              'Are you sure you want to deactivate your account? This action can be reversed later.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showSuccessSnackBar(
-                    context,
-                    'Account deactivation process started',
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade600,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Deactivate'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _showSuccessSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(message),
-          ],
-        ),
-        backgroundColor: Colors.green.shade600,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

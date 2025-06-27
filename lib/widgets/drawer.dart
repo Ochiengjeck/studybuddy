@@ -190,10 +190,8 @@ class _CustomDrawerState extends State<CustomDrawer>
               if (appProvider.isInitializing) {
                 return const Center(child: CircularProgressIndicator());
               }
-              if (appProvider.initializationError != null) {
-                return Center(
-                  child: Text('Error: ${appProvider.initializationError}'),
-                );
+              if (appProvider.error != null) {
+                return Center(child: Text('Error: ${appProvider.error}'));
               }
               if (appProvider.currentUser == null) {
                 return const Center(child: Text('Please log in'));
@@ -224,7 +222,7 @@ class _CustomDrawerState extends State<CustomDrawer>
                               index: 1,
                               isSelected: widget.currentIndex == 1,
                               badge:
-                                  sessionProvider.pendingSessions?.length
+                                  sessionProvider.upcomingSessions?.length
                                       .toString(),
                             ),
                             _buildDrawerItem(
@@ -242,13 +240,7 @@ class _CustomDrawerState extends State<CustomDrawer>
                               subtitle: 'Chat & Support',
                               index: 3,
                               isSelected: widget.currentIndex == 3,
-                              badge:
-                                  chatProvider.chats
-                                      ?.fold<int>(
-                                        0,
-                                        (sum, chat) => sum + chat.unreadCount,
-                                      )
-                                      .toString(),
+                              badge: chatProvider.chats?.length.toString(),
                             ),
                             const SizedBox(height: 16),
                             _buildSectionHeader('Progress'),
