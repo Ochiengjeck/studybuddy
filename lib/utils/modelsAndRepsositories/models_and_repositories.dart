@@ -325,7 +325,6 @@ class UserStats {
 // =============================================
 // 6. Session Models
 // =============================================
-
 enum SessionStatus { upcoming, completed, pending, declined, inProgress }
 
 enum SessionType { application, organized }
@@ -391,68 +390,6 @@ class Session {
     this.price = 0.0,
   });
 
-  Session copyWith({
-    String? id,
-    String? title,
-    String? tutorName,
-    String? tutorImage,
-    String? platform,
-    DateTime? startTime,
-    Duration? duration,
-    String? description,
-    SessionStatus? status,
-    SessionType? type,
-    double? rating,
-    String? review,
-    List<String>? participantImages,
-    List<String>? participants,
-    bool? isCurrentUser,
-    String? userId,
-    String? organizerId,
-    String? subject,
-    String? level,
-    String? notes,
-    int? maxParticipants,
-    int? currentParticipants,
-    bool? isRecurring,
-    String? recurringPattern,
-    bool? isPaid,
-    double? price,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return Session(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      tutorName: tutorName ?? this.tutorName,
-      tutorImage: tutorImage ?? this.tutorImage,
-      platform: platform ?? this.platform,
-      startTime: startTime ?? this.startTime,
-      duration: duration ?? this.duration,
-      description: description ?? this.description,
-      status: status ?? this.status,
-      type: type ?? this.type,
-      rating: rating ?? this.rating,
-      review: review ?? this.review,
-      participantImages: participantImages ?? this.participantImages,
-      participants: participants ?? this.participants,
-      isCurrentUser: isCurrentUser ?? this.isCurrentUser,
-      userId: userId ?? this.userId,
-      organizerId: organizerId ?? this.organizerId,
-      subject: subject ?? this.subject,
-      level: level ?? this.level,
-      notes: notes ?? this.notes,
-      maxParticipants: maxParticipants ?? this.maxParticipants,
-      currentParticipants: currentParticipants ?? this.currentParticipants,
-      isRecurring: isRecurring ?? this.isRecurring,
-      recurringPattern: recurringPattern ?? this.recurringPattern,
-      isPaid: isPaid ?? this.isPaid,
-      price: price ?? this.price,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
-
   factory Session.fromJson(Map<String, dynamic> json) {
     return Session(
       id: json['id']?.toString() ?? '',
@@ -472,7 +409,7 @@ class Session {
       participantImages: _parseStringList(json['participant_images']),
       participants: _parseStringList(json['participants']),
       isCurrentUser: json['is_current_user'] == true,
-      userId: json['user_id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
       organizerId: json['organizer_id']?.toString(),
       subject: json['subject']?.toString() ?? '',
       level: json['level']?.toString() ?? '',
@@ -504,7 +441,7 @@ class Session {
     'participant_images': participantImages,
     'participants': participants,
     'is_current_user': isCurrentUser,
-    'user_id': userId,
+    'userId': userId,
     'organizer_id': organizerId,
     'subject': subject,
     'level': level,
@@ -659,10 +596,10 @@ class Session {
   }
 
   String get fullTimeRange {
-    return '${_formatTime(startTime)} - ${endTimeFormatted}';
+    return '${_formatTime(startTime)} - $endTimeFormatted';
   }
 
-  // Helper methods for parsing
+  // Helper methods
   static DateTime _parseDateTime(dynamic value) {
     if (value == null) return DateTime.now();
     if (value is Timestamp) return value.toDate();
@@ -711,7 +648,6 @@ class Session {
 
   static SessionStatus _parseSessionStatus(dynamic status) {
     if (status == null) return SessionStatus.upcoming;
-
     final statusStr = status.toString().toLowerCase();
     switch (statusStr) {
       case 'upcoming':
@@ -732,7 +668,6 @@ class Session {
 
   static SessionType _parseSessionType(dynamic type) {
     if (type == null) return SessionType.application;
-
     final typeStr = type.toString().toLowerCase();
     switch (typeStr) {
       case 'application':
@@ -765,23 +700,14 @@ class Session {
     'December',
   ];
 
-  // Utility methods for common operations
-  Duration get timeUntilStart {
-    return startTime.difference(DateTime.now());
-  }
+  Duration get timeUntilStart => startTime.difference(DateTime.now());
 
-  bool get isStartingSoon {
-    final timeUntil = timeUntilStart;
-    return timeUntil.inMinutes <= 15 && timeUntil.inMinutes > 0;
-  }
+  bool get isStartingSoon =>
+      timeUntilStart.inMinutes <= 15 && timeUntilStart.inMinutes > 0;
 
-  bool get hasStarted {
-    return DateTime.now().isAfter(startTime);
-  }
+  bool get hasStarted => DateTime.now().isAfter(startTime);
 
-  bool get hasEnded {
-    return DateTime.now().isAfter(startTime.add(duration));
-  }
+  bool get hasEnded => DateTime.now().isAfter(startTime.add(duration));
 
   String get timeStatus {
     if (hasEnded) return 'Ended';
@@ -790,7 +716,6 @@ class Session {
     return 'Upcoming';
   }
 
-  // Validation methods
   bool get isValid {
     return id.isNotEmpty &&
         title.isNotEmpty &&
@@ -802,7 +727,6 @@ class Session {
 
   List<String> get validationErrors {
     final errors = <String>[];
-
     if (id.isEmpty) errors.add('Session ID is required');
     if (title.isEmpty) errors.add('Title is required');
     if (subject.isEmpty) errors.add('Subject is required');
@@ -821,7 +745,6 @@ class Session {
         currentParticipants! > maxParticipants!) {
       errors.add('Current participants cannot exceed max participants');
     }
-
     return errors;
   }
 
@@ -834,9 +757,8 @@ class Session {
   int get hashCode => id.hashCode;
 
   @override
-  String toString() {
-    return 'Session{id: $id, title: $title, status: $status, startTime: $startTime}';
-  }
+  String toString() =>
+      'Session{id: $id, title: $title, status: $status, startTime: $startTime}';
 }
 
 // =============================================
@@ -984,6 +906,7 @@ class Tutor {
   final String id;
   final String userId;
   final String name;
+  final String type; // Added to distinguish as 'tutor'
   final String? bio;
   final String? education;
   final String? experience;
@@ -1005,6 +928,7 @@ class Tutor {
     required this.id,
     required this.userId,
     required this.name,
+    this.type = 'tutor', // Default to 'tutor'
     this.bio,
     this.education,
     this.experience,
@@ -1025,22 +949,23 @@ class Tutor {
 
   factory Tutor.fromJson(Map<String, dynamic> json) => Tutor(
     id: json['id']?.toString() ?? '',
-    userId: json['user_id']?.toString() ?? '',
-    name: json['name'] ?? '',
-    bio: json['bio'],
-    education: json['education'],
-    experience: json['experience'],
-    teachingStyle: json['teaching_style'],
+    userId: json['userId']?.toString() ?? '',
+    name: json['personal_info']['fullName']?.toString() ?? 'Unknown Tutor',
+    type: json['type']?.toString() ?? 'tutor',
+    bio: json['personal_info']['experience']?.toString(),
+    education: json['personal_info']['fieldOfStudy']?.toString(),
+    experience: json['personal_info']['experience']?.toString(),
+    teachingStyle: json['teaching_style']?.toString() ?? "To be discussed",
     rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
     sessionsCompleted: json['sessions_completed'] ?? 0,
     points: json['points'] ?? 0,
     badges: json['badges'] ?? 0,
     isAvailable: json['is_available'] ?? false,
-    profilePicture: json['profile_picture'],
+    profilePicture: json['profile_picture']?.toString(),
     subjects: List<String>.from(json['subjects'] ?? []),
     availability: _parseAvailability(json['availability']),
-    preferredTeachingMode: json['preferred_teaching_mode'],
-    preferredVenue: json['preferred_venue'],
+    preferredTeachingMode: json['teaching_mode']?.toString(),
+    preferredVenue: json['preferred_venue']?.toString(),
     createdAt:
         json['created_at'] != null
             ? (json['created_at'] is Timestamp
@@ -1069,8 +994,9 @@ class Tutor {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'user_id': userId,
+    'userId': userId,
     'name': name,
+    'type': type,
     'bio': bio,
     'education': education,
     'experience': experience,
@@ -1085,14 +1011,15 @@ class Tutor {
     'availability': availability,
     'preferred_teaching_mode': preferredTeachingMode,
     'preferred_venue': preferredVenue,
-    'created_at': createdAt,
-    'updated_at': updatedAt,
+    'created_at': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
+    'updated_at': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
   };
 }
 
 class TutorApplication {
   final String id;
   final String userId;
+  final String type; // Added to distinguish as 'application'
   final String status;
   final Map<String, dynamic> personalInfo;
   final List<String> subjects;
@@ -1106,6 +1033,7 @@ class TutorApplication {
   TutorApplication({
     required this.id,
     required this.userId,
+    this.type = 'application', // Default to 'application'
     required this.status,
     required this.personalInfo,
     required this.subjects,
@@ -1120,13 +1048,14 @@ class TutorApplication {
   factory TutorApplication.fromJson(Map<String, dynamic> json) =>
       TutorApplication(
         id: json['id']?.toString() ?? '',
-        userId: json['user_id']?.toString() ?? '',
-        status: json['status'] ?? 'pending',
+        userId: json['userId']?.toString() ?? '',
+        type: json['type']?.toString() ?? 'application',
+        status: json['status']?.toString() ?? 'pending',
         personalInfo: Map<String, dynamic>.from(json['personal_info'] ?? {}),
         subjects: List<String>.from(json['subjects'] ?? []),
         availability: _parseAvailability(json['availability']),
-        teachingMode: json['teaching_mode'],
-        venue: json['venue'],
+        teachingMode: json['teaching_mode']?.toString(),
+        venue: json['venue']?.toString(),
         submittedAt:
             json['submitted_at'] != null
                 ? (json['submitted_at'] is Timestamp
@@ -1139,7 +1068,7 @@ class TutorApplication {
                     ? json['reviewed_at'].toDate()
                     : DateTime.parse(json['reviewed_at']))
                 : null,
-        reviewNotes: json['review_notes'],
+        reviewNotes: json['review_notes']?.toString(),
       );
 
   static Map<String, List<String>> _parseAvailability(dynamic availability) {
@@ -1156,15 +1085,17 @@ class TutorApplication {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'user_id': userId,
+    'userId': userId,
+    'type': type,
     'status': status,
     'personal_info': personalInfo,
     'subjects': subjects,
     'availability': availability,
     'teaching_mode': teachingMode,
     'venue': venue,
-    'submitted_at': submittedAt,
-    'reviewed_at': reviewedAt,
+    'submitted_at':
+        submittedAt != null ? Timestamp.fromDate(submittedAt!) : null,
+    'reviewed_at': reviewedAt != null ? Timestamp.fromDate(reviewedAt!) : null,
     'review_notes': reviewNotes,
   };
 }
@@ -1193,15 +1124,13 @@ class Chat {
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) => Chat(
-    id: json['id']?.toString() ?? '',
-    name: json['name'] ?? '',
-    imageUrl: json['image_url'],
-    lastMessage: json['last_message'] ?? '',
+    id: json['id'] as String,
+    name: json['name'] as String,
+    imageUrl: json['image_url'] as String?,
+    lastMessage: json['last_message'] as String? ?? '',
     lastMessageTime:
-        json['last_message_time'] is Timestamp
-            ? json['last_message_time'].toDate()
-            : DateTime.parse(json['last_message_time']),
-    unreadCount: json['unread_count'] ?? 0,
+        (json['last_message_time'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    unreadCount: json['unread_count'] as int? ?? 0,
   );
 
   Map<String, dynamic> toJson() => {
@@ -1209,9 +1138,27 @@ class Chat {
     'name': name,
     'image_url': imageUrl,
     'last_message': lastMessage,
-    'last_message_time': lastMessageTime,
+    'last_message_time': Timestamp.fromDate(lastMessageTime),
     'unread_count': unreadCount,
   };
+
+  Chat copyWith({
+    String? id,
+    String? name,
+    String? imageUrl,
+    String? lastMessage,
+    DateTime? lastMessageTime,
+    int? unreadCount,
+  }) {
+    return Chat(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      imageUrl: imageUrl ?? this.imageUrl,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+      unreadCount: unreadCount ?? this.unreadCount,
+    );
+  }
 }
 
 class Message {
@@ -1233,36 +1180,47 @@ class Message {
     required this.status,
   });
 
-  factory Message.fromJson(Map<String, dynamic> json) {
-    return Message(
-      id: json['id'] ?? '',
-      chatId: json['chatId'] ?? '',
-      text: json['text'] ?? '',
-      senderId: json['senderId'] ?? '',
-      isMe: json['isMe'] ?? false,
-      time:
-          json['time'] is Timestamp
-              ? json['time'].toDate()
-              : DateTime.parse(
-                json['time'] ?? DateTime.now().toIso8601String(),
-              ),
-      status: MessageStatus.values.firstWhere(
-        (e) => e.toString() == 'MessageStatus.${json['status']}',
-        orElse: () => MessageStatus.sent,
-      ),
-    );
-  }
+  factory Message.fromJson(Map<String, dynamic> json) => Message(
+    id: json['id'] as String? ?? '',
+    chatId: json['chatId'] as String? ?? '',
+    text: json['text'] as String? ?? '',
+    senderId: json['senderId'] as String? ?? '',
+    isMe: json['isMe'] as bool? ?? false,
+    time: (json['time'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    status: MessageStatus.values.firstWhere(
+      (e) => e.toString() == 'MessageStatus.${json['status']}',
+      orElse: () => MessageStatus.sent,
+    ),
+  );
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'chatId': chatId,
-      'text': text,
-      'senderId': senderId,
-      'isMe': isMe,
-      'time': time.toIso8601String(),
-      'status': status.toString().split('.').last,
-    };
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'chatId': chatId,
+    'text': text,
+    'senderId': senderId,
+    'isMe': isMe,
+    'time': Timestamp.fromDate(time),
+    'status': status.toString().split('.').last,
+  };
+
+  Message copyWith({
+    String? id,
+    String? chatId,
+    String? text,
+    String? senderId,
+    bool? isMe,
+    DateTime? time,
+    MessageStatus? status,
+  }) {
+    return Message(
+      id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
+      text: text ?? this.text,
+      senderId: senderId ?? this.senderId,
+      isMe: isMe ?? this.isMe,
+      time: time ?? this.time,
+      status: status ?? this.status,
+    );
   }
 }
 
@@ -1561,6 +1519,66 @@ class TestQuestion {
 }
 
 // =============================================
+// Validation Utility for validation and error handling
+// =============================================
+
+class ValidationUtil {
+  static void validateSessionTiming(DateTime startTime) {
+    if (startTime.isBefore(DateTime.now())) {
+      throw ApiError(
+        message: 'Cannot schedule session in the past',
+        code: 'INVALID_TIME',
+      );
+    }
+  }
+
+  static void validateDuration(int durationMinutes) {
+    if (durationMinutes < 15) {
+      throw ApiError(
+        message: 'Session duration must be at least 15 minutes',
+        code: 'INVALID_DURATION',
+      );
+    }
+  }
+
+  static void validateParticipants(int? current, int? max) {
+    if (current != null && max != null && current > max) {
+      throw ApiError(
+        message: 'Current participants cannot exceed max participants',
+        code: 'PARTICIPANT_LIMIT_EXCEEDED',
+      );
+    }
+  }
+
+  static void validateRating(int rating) {
+    if (rating < 1 || rating > 5) {
+      throw ApiError(
+        message: 'Rating must be between 1 and 5',
+        code: 'INVALID_RATING',
+      );
+    }
+  }
+
+  static void validateMaxParticipants(int maxParticipants) {
+    if (maxParticipants < 1) {
+      throw ApiError(
+        message: 'Must allow at least 1 participant',
+        code: 'INVALID_PARTICIPANT_COUNT',
+      );
+    }
+  }
+
+  static void validatePrice(bool isPaid, double price) {
+    if (isPaid && price <= 0) {
+      throw ApiError(
+        message: 'Paid sessions must have a price greater than 0',
+        code: 'INVALID_PRICE',
+      );
+    }
+  }
+}
+
+// =============================================
 // 12. Repositories
 // =============================================
 
@@ -1840,7 +1858,6 @@ class AchievementsRepository {
   }
 
   Future<ApiResponse<UserStats>> getUserStats(String userId) async {
-    debugPrint('Getting user stats...');
     try {
       final doc =
           await FirebaseConfig.firestore
@@ -1849,8 +1866,6 @@ class AchievementsRepository {
               .collection('stats')
               .doc('current')
               .get();
-
-      debugPrint('User stats data: ${doc.data()}');
 
       if (!doc.exists || doc.data() == null) {
         // Return default stats if no data exists
@@ -2003,22 +2018,43 @@ class LeaderboardRepository {
 }
 
 class SessionRepository {
-  // Fixed: Added consistent field name usage
+  // Note: Ensure Firestore composite indexes are created for:
+  // - sessions: userId, status, start_time
+  // - sessions: subject, level, start_time
+  // - sessions: status, type, start_time
+
+  Future<List<Session>> _fetchSessions({
+    required String userId,
+    String? status,
+    String? orderByField = 'start_time',
+    bool descending = false,
+  }) async {
+    Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+        .collection('sessions')
+        .where('userId', isEqualTo: userId);
+
+    if (status != null) {
+      query = query.where('status', isEqualTo: status);
+    }
+
+    if (orderByField != null) {
+      query = query.orderBy(orderByField, descending: descending);
+    }
+
+    final snapshot = await query.get();
+    return snapshot.docs
+        .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
+        .toList();
+  }
+
   Future<ApiResponse<List<Session>>> getUpcomingSessions(String userId) async {
     try {
-      final snapshot =
-          await FirebaseConfig.firestore
-              .collection('sessions')
-              .where('userId', isEqualTo: userId)
-              .where('status', isEqualTo: 'upcoming')
-              .orderBy('preferredDateTime', descending: false)
-              .get();
-
-      final sessions =
-          snapshot.docs
-              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
-              .toList();
-
+      final sessions = await _fetchSessions(
+        userId: userId,
+        status: 'upcoming',
+        orderByField: 'start_time',
+        descending: false,
+      );
       return ApiResponse<List<Session>>(
         success: true,
         message: 'Upcoming sessions retrieved',
@@ -2031,19 +2067,12 @@ class SessionRepository {
 
   Future<ApiResponse<List<Session>>> getPastSessions(String userId) async {
     try {
-      final snapshot =
-          await FirebaseConfig.firestore
-              .collection('sessions')
-              .where('userId', isEqualTo: userId)
-              .where('status', isEqualTo: 'completed')
-              .orderBy('preferredDateTime', descending: true)
-              .get();
-
-      final sessions =
-          snapshot.docs
-              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
-              .toList();
-
+      final sessions = await _fetchSessions(
+        userId: userId,
+        status: 'completed',
+        orderByField: 'start_time',
+        descending: true,
+      );
       return ApiResponse<List<Session>>(
         success: true,
         message: 'Past sessions retrieved',
@@ -2056,36 +2085,23 @@ class SessionRepository {
 
   Future<ApiResponse<List<Session>>> getPendingSessions(String userId) async {
     try {
-      final snapshot =
-          await FirebaseConfig.firestore
-              .collection('sessions')
-              .where('userId', isEqualTo: userId)
-              .where('status', isEqualTo: 'pending')
-              .get();
-
-      if (snapshot.docs.isEmpty) {
-        debugPrint('No sessions found for user $userId with status pending');
-      } else {
-        debugPrint('Found ${snapshot.docs} pending sessions for user $userId');
-      }
-
-      final sessions =
-          snapshot.docs
-              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
-              .toList();
-
+      final sessions = await _fetchSessions(userId: userId, status: 'pending');
+      debugPrint(
+        sessions.isEmpty
+            ? 'No sessions found for user $userId with status pending'
+            : 'Found ${sessions.length} pending sessions for user $userId',
+      );
       return ApiResponse<List<Session>>(
         success: true,
         message: 'Pending sessions retrieved',
         data: sessions,
       );
     } catch (e) {
-      debugPrint("error incured ${e.toString()}");
+      debugPrint('Error incurred: ${e.toString()}');
       throw ApiError.fromFirebaseException(e);
     }
   }
 
-  // Enhanced: Added user validation
   Future<ApiResponse<Session>> getSessionDetails(
     String userId,
     String sessionId,
@@ -2098,15 +2114,17 @@ class SessionRepository {
               .get();
 
       if (!doc.exists) {
-        throw ApiError(message: 'Session not found');
+        throw ApiError(message: 'Session not found', code: 'SESSION_NOT_FOUND');
       }
 
       final sessionData = doc.data()!;
 
-      // Check if user has access to this session
-      if (sessionData['user_id'] != userId &&
-          !(sessionData['participants'] as List?)!.contains(userId) == true) {
-        throw ApiError(message: 'Access denied to this session');
+      if (sessionData['userId'] != userId &&
+          !(sessionData['participants'] as List?)!.contains(userId)) {
+        throw ApiError(
+          message: 'Access denied to this session',
+          code: 'ACCESS_DENIED',
+        );
       }
 
       return ApiResponse<Session>(
@@ -2119,7 +2137,6 @@ class SessionRepository {
     }
   }
 
-  // Enhanced: Added user validation and status update
   Future<ApiResponse<void>> cancelSession(
     String userId,
     String sessionId,
@@ -2133,21 +2150,28 @@ class SessionRepository {
         final sessionDoc = await transaction.get(sessionRef);
 
         if (!sessionDoc.exists) {
-          throw ApiError(message: 'Session not found');
+          throw ApiError(
+            message: 'Session not found',
+            code: 'SESSION_NOT_FOUND',
+          );
         }
 
         final sessionData = sessionDoc.data()!;
 
-        // Check if user owns the session or is the organizer
-        if (sessionData['user_id'] != userId &&
+        if (sessionData['userId'] != userId &&
             sessionData['organizer_id'] != userId) {
-          throw ApiError(message: 'You can only cancel your own sessions');
+          throw ApiError(
+            message: 'You can only cancel your own sessions',
+            code: 'ACCESS_DENIED',
+          );
         }
 
-        // Check if session can be cancelled
         final status = sessionData['status'];
         if (status == 'completed' || status == 'declined') {
-          throw ApiError(message: 'Cannot cancel a $status session');
+          throw ApiError(
+            message: 'Cannot cancel a $status session',
+            code: 'INVALID_STATUS',
+          );
         }
 
         transaction.update(sessionRef, {
@@ -2165,13 +2189,14 @@ class SessionRepository {
     }
   }
 
-  // Enhanced: Added validation and permission checks
   Future<ApiResponse<void>> rescheduleSession(
     String userId,
     String sessionId,
     DateTime newTime,
   ) async {
     try {
+      ValidationUtil.validateSessionTiming(newTime);
+
       final sessionRef = FirebaseConfig.firestore
           .collection('sessions')
           .doc(sessionId);
@@ -2180,20 +2205,20 @@ class SessionRepository {
         final sessionDoc = await transaction.get(sessionRef);
 
         if (!sessionDoc.exists) {
-          throw ApiError(message: 'Session not found');
+          throw ApiError(
+            message: 'Session not found',
+            code: 'SESSION_NOT_FOUND',
+          );
         }
 
         final sessionData = sessionDoc.data()!;
 
-        // Check permissions
-        if (sessionData['user_id'] != userId &&
+        if (sessionData['userId'] != userId &&
             sessionData['organizer_id'] != userId) {
-          throw ApiError(message: 'You can only reschedule your own sessions');
-        }
-
-        // Validate new time
-        if (newTime.isBefore(DateTime.now())) {
-          throw ApiError(message: 'Cannot reschedule to a past date');
+          throw ApiError(
+            message: 'You can only reschedule your own sessions',
+            code: 'ACCESS_DENIED',
+          );
         }
 
         transaction.update(sessionRef, {
@@ -2211,7 +2236,6 @@ class SessionRepository {
     }
   }
 
-  // Enhanced: Added validation
   Future<ApiResponse<void>> submitFeedback(
     String userId,
     String sessionId,
@@ -2219,9 +2243,7 @@ class SessionRepository {
     String review,
   ) async {
     try {
-      if (rating < 1 || rating > 5) {
-        throw ApiError(message: 'Rating must be between 1 and 5');
-      }
+      ValidationUtil.validateRating(rating);
 
       final sessionRef = FirebaseConfig.firestore
           .collection('sessions')
@@ -2231,22 +2253,27 @@ class SessionRepository {
         final sessionDoc = await transaction.get(sessionRef);
 
         if (!sessionDoc.exists) {
-          throw ApiError(message: 'Session not found');
+          throw ApiError(
+            message: 'Session not found',
+            code: 'SESSION_NOT_FOUND',
+          );
         }
 
         final sessionData = sessionDoc.data()!;
 
-        // Check if user participated in the session
-        if (sessionData['user_id'] != userId &&
-            !(sessionData['participants'] as List?)!.contains(userId) == true) {
+        if (sessionData['userId'] != userId &&
+            !(sessionData['participants'] as List?)!.contains(userId)) {
           throw ApiError(
             message: 'You can only rate sessions you participated in',
+            code: 'ACCESS_DENIED',
           );
         }
 
-        // Check if session is completed
         if (sessionData['status'] != 'completed') {
-          throw ApiError(message: 'You can only rate completed sessions');
+          throw ApiError(
+            message: 'You can only rate completed sessions',
+            code: 'INVALID_STATUS',
+          );
         }
 
         transaction.update(sessionRef, {
@@ -2265,35 +2292,28 @@ class SessionRepository {
     }
   }
 
-  // Enhanced: Added validation and better data structure
   Future<ApiResponse<Session>> applyForSession({
     required String userId,
     required String title,
     required String subject,
     required String level,
     required String description,
-    required DateTime preferredDateTime,
+    required DateTime startTime,
     required Duration duration,
     required String platform,
     String? notes,
   }) async {
     try {
-      // Validation
-      if (preferredDateTime.isBefore(DateTime.now())) {
-        throw ApiError(message: 'Cannot schedule session in the past');
-      }
-
-      if (duration.inMinutes < 15) {
-        throw ApiError(message: 'Session duration must be at least 15 minutes');
-      }
+      ValidationUtil.validateSessionTiming(startTime);
+      ValidationUtil.validateDuration(duration.inMinutes);
 
       final applicationData = {
-        'user_id': userId,
+        'userId': userId,
         'title': title.trim(),
         'subject': subject,
         'level': level,
         'description': description.trim(),
-        'start_time': Timestamp.fromDate(preferredDateTime),
+        'start_time': Timestamp.fromDate(startTime),
         'duration_minutes': duration.inMinutes,
         'platform': platform,
         'status': 'pending',
@@ -2324,14 +2344,13 @@ class SessionRepository {
     }
   }
 
-  // Enhanced: Added validation and consistent data structure
   Future<ApiResponse<Session>> organizeSession({
     required String userId,
     required String title,
     required String subject,
     required String level,
     required String description,
-    required DateTime scheduledDateTime,
+    required DateTime startTime,
     required Duration duration,
     required String platform,
     required int maxParticipants,
@@ -2341,39 +2360,25 @@ class SessionRepository {
     double price = 0.0,
   }) async {
     try {
-      // Validation
-      if (scheduledDateTime.isBefore(DateTime.now())) {
-        throw ApiError(message: 'Cannot schedule session in the past');
-      }
-
-      if (duration.inMinutes < 15) {
-        throw ApiError(message: 'Session duration must be at least 15 minutes');
-      }
-
-      if (maxParticipants < 1) {
-        throw ApiError(message: 'Must allow at least 1 participant');
-      }
-
-      if (isPaid && price <= 0) {
-        throw ApiError(
-          message: 'Paid sessions must have a price greater than 0',
-        );
-      }
+      ValidationUtil.validateSessionTiming(startTime);
+      ValidationUtil.validateDuration(duration.inMinutes);
+      ValidationUtil.validateMaxParticipants(maxParticipants);
+      ValidationUtil.validatePrice(isPaid, price);
 
       final sessionData = {
+        'userId': userId,
         'organizer_id': userId,
-        'user_id': userId,
         'title': title.trim(),
         'subject': subject,
         'level': level,
         'description': description.trim(),
-        'start_time': Timestamp.fromDate(scheduledDateTime),
+        'start_time': Timestamp.fromDate(startTime),
         'duration_minutes': duration.inMinutes,
         'platform': platform,
         'status': 'upcoming',
         'type': 'organized',
         'max_participants': maxParticipants,
-        'current_participants': 1, // Organizer is automatically a participant
+        'current_participants': 1,
         'is_recurring': isRecurring,
         'recurring_pattern': recurringPattern,
         'is_paid': isPaid,
@@ -2381,7 +2386,7 @@ class SessionRepository {
         'tutor_name': 'You',
         'tutor_image': '',
         'participant_images': <String>[],
-        'participants': [userId], // Organizer is automatically added
+        'participants': [userId],
         'is_current_user': true,
         'created_at': Timestamp.now(),
         'updated_at': Timestamp.now(),
@@ -2403,7 +2408,6 @@ class SessionRepository {
     }
   }
 
-  // Fixed: Corrected Firestore query structure
   Future<ApiResponse<List<Session>>> getAvailableSessions({
     String? subject,
     String? level,
@@ -2411,27 +2415,23 @@ class SessionRepository {
     DateTime? endDate,
   }) async {
     try {
-      Query query = FirebaseConfig.firestore
+      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
           .collection('sessions')
           .where('status', isEqualTo: 'upcoming')
           .where('type', isEqualTo: 'organized');
 
-      // Apply filters sequentially to avoid composite index issues
       if (subject != null && subject.isNotEmpty) {
         query = query.where('subject', isEqualTo: subject);
       }
-
       if (level != null && level.isNotEmpty) {
         query = query.where('level', isEqualTo: level);
       }
-
       if (startDate != null) {
         query = query.where(
           'start_time',
           isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
         );
       }
-
       if (endDate != null) {
         query = query.where(
           'start_time',
@@ -2440,17 +2440,11 @@ class SessionRepository {
       }
 
       final snapshot =
-          await query.orderBy('preferredDateTime', descending: false).get();
+          await query.orderBy('start_time', descending: false).get();
 
-      // Filter sessions that have available spots
       final sessions =
           snapshot.docs
-              .map(
-                (doc) => Session.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }),
-              )
+              .map((doc) => Session.fromJson({...doc.data(), 'id': doc.id}))
               .where((session) {
                 final currentParticipants = session.currentParticipants ?? 0;
                 final maxParticipants = session.maxParticipants ?? 0;
@@ -2468,7 +2462,6 @@ class SessionRepository {
     }
   }
 
-  // Enhanced: Added comprehensive validation
   Future<ApiResponse<void>> joinSession(String userId, String sessionId) async {
     try {
       final sessionRef = FirebaseConfig.firestore
@@ -2479,20 +2472,27 @@ class SessionRepository {
         final sessionDoc = await transaction.get(sessionRef);
 
         if (!sessionDoc.exists) {
-          throw ApiError(message: 'Session not found');
+          throw ApiError(
+            message: 'Session not found',
+            code: 'SESSION_NOT_FOUND',
+          );
         }
 
         final sessionData = sessionDoc.data()!;
 
-        // Validate session status
         if (sessionData['status'] != 'upcoming') {
-          throw ApiError(message: 'Cannot join this session');
+          throw ApiError(
+            message: 'Cannot join this session',
+            code: 'INVALID_STATUS',
+          );
         }
 
-        // Check if session is in the future
         final startTime = (sessionData['start_time'] as Timestamp).toDate();
         if (startTime.isBefore(DateTime.now())) {
-          throw ApiError(message: 'Cannot join a past session');
+          throw ApiError(
+            message: 'Cannot join a past session',
+            code: 'PAST_SESSION',
+          );
         }
 
         final currentParticipants = sessionData['current_participants'] ?? 0;
@@ -2502,11 +2502,14 @@ class SessionRepository {
         );
 
         if (currentParticipants >= maxParticipants) {
-          throw ApiError(message: 'Session is full');
+          throw ApiError(message: 'Session is full', code: 'SESSION_FULL');
         }
 
         if (participants.contains(userId)) {
-          throw ApiError(message: 'Already joined this session');
+          throw ApiError(
+            message: 'Already joined this session',
+            code: 'ALREADY_JOINED',
+          );
         }
 
         participants.add(userId);
@@ -2527,7 +2530,6 @@ class SessionRepository {
     }
   }
 
-  // Enhanced: Added validation and edge case handling
   Future<ApiResponse<void>> leaveSession(
     String userId,
     String sessionId,
@@ -2541,7 +2543,10 @@ class SessionRepository {
         final sessionDoc = await transaction.get(sessionRef);
 
         if (!sessionDoc.exists) {
-          throw ApiError(message: 'Session not found');
+          throw ApiError(
+            message: 'Session not found',
+            code: 'SESSION_NOT_FOUND',
+          );
         }
 
         final sessionData = sessionDoc.data()!;
@@ -2550,21 +2555,24 @@ class SessionRepository {
         );
 
         if (!participants.contains(userId)) {
-          throw ApiError(message: 'Not a participant of this session');
+          throw ApiError(
+            message: 'Not a participant of this session',
+            code: 'NOT_PARTICIPANT',
+          );
         }
 
-        // Check if user is the organizer
         if (sessionData['organizer_id'] == userId) {
           throw ApiError(
             message:
                 'Organizers cannot leave their own sessions. Cancel the session instead.',
+            code: 'ORGANIZER_CANNOT_LEAVE',
           );
         }
 
-        // Check if session is still upcoming
         if (sessionData['status'] != 'upcoming') {
           throw ApiError(
             message: 'Cannot leave a session that is not upcoming',
+            code: 'INVALID_STATUS',
           );
         }
 
@@ -2686,6 +2694,10 @@ class HomeRepository {
 }
 
 class TutorRepository {
+  // Note: Ensure Firestore composite indexes are created for:
+  // - tutors: type, subjects, rating
+  // - tutors: type, userId
+
   Future<ApiResponse<List<Tutor>>> getTutors({
     String? subject,
     String? availability,
@@ -2696,6 +2708,7 @@ class TutorRepository {
     try {
       Query<Map<String, dynamic>> query = FirebaseConfig.firestore
           .collection('tutors')
+          .where('type', isEqualTo: 'tutor')
           .limit(limit);
 
       if (subject != null && subject.isNotEmpty) {
@@ -2703,6 +2716,11 @@ class TutorRepository {
       }
       if (minRating != null) {
         query = query.where('rating', isGreaterThanOrEqualTo: minRating);
+      }
+      if (offset > 0) {
+        // For pagination, assume we have a last document or offset logic
+        // This is simplified; in practice, use startAfterDocument
+        query = query.startAfter([offset]);
       }
 
       final snapshot = await query.get();
@@ -2731,13 +2749,21 @@ class TutorRepository {
               .get();
 
       if (!doc.exists) {
-        throw ApiError(message: 'Tutor not found');
+        throw ApiError(message: 'Tutor not found', code: 'TUTOR_NOT_FOUND');
+      }
+
+      final data = doc.data()!;
+      if (data['type'] != 'tutor') {
+        throw ApiError(
+          message: 'Document is not a tutor',
+          code: 'INVALID_TYPE',
+        );
       }
 
       return ApiResponse<Tutor>(
         success: true,
         message: 'Tutor details retrieved',
-        data: Tutor.fromJson({...doc.data()!, 'id': doc.id}),
+        data: Tutor.fromJson({...data, 'id': doc.id}),
       );
     } catch (e) {
       throw ApiError.fromFirebaseException(e);
@@ -2754,7 +2780,8 @@ class TutorRepository {
   }) async {
     try {
       final applicationData = {
-        'user_id': userId,
+        'userId': userId,
+        'type': 'application',
         'status': 'pending',
         'personal_info': personalInfo,
         'subjects': subjects,
@@ -2765,7 +2792,7 @@ class TutorRepository {
       };
 
       final ref = await FirebaseConfig.firestore
-          .collection('tutor_applications')
+          .collection('tutors')
           .add(applicationData);
 
       return ApiResponse<TutorApplication>(
@@ -2784,8 +2811,8 @@ class TutorRepository {
     try {
       final snapshot =
           await FirebaseConfig.firestore
-              .collection('tutor_applications')
-              .where('user_id', isEqualTo: userId)
+              .collection('tutors')
+              .where('type', isEqualTo: 'application')
               .get();
 
       final applications =
@@ -2806,138 +2833,68 @@ class TutorRepository {
     }
   }
 
-  Future<ApiResponse<String>> requestTutor({
-    required String userId,
-    required String subject,
-    required String details,
-    String? priority,
+  Future<ApiResponse<Tutor>> approveTutorApplication({
+    required String applicationId,
+    required String name,
+    String? bio,
+    String? education,
+    String? experience,
+    String? teachingStyle,
+    String? profilePicture,
   }) async {
     try {
-      final requestData = {
-        'user_id': userId,
-        'subject': subject,
-        'details': details,
-        'priority': priority ?? 'normal',
-        'created_at': Timestamp.now(),
-        'status': 'pending',
-      };
+      final applicationRef = FirebaseConfig.firestore
+          .collection('tutors')
+          .doc(applicationId);
 
-      final docRef = await FirebaseConfig.firestore
-          .collection('tutor_requests')
-          .add(requestData);
-
-      return ApiResponse<String>(
-        success: true,
-        message: 'Tutor request submitted successfully',
-        data: docRef.id,
-      );
-    } catch (e) {
-      throw ApiError.fromFirebaseException(e);
-    }
-  }
-
-  Future<ApiResponse<String>> createTutorRequest({
-    required String userId,
-    required String subject,
-    required String details,
-    String? priority,
-  }) async {
-    try {
-      final requestData = {
-        'user_id': userId,
-        'subject': subject,
-        'details': details,
-        'priority': priority ?? 'normal',
-        'created_at': Timestamp.now(),
-        'status': 'pending',
-      };
-
-      final docRef = await FirebaseConfig.firestore
-          .collection('tutor_requests')
-          .add(requestData);
-
-      return ApiResponse<String>(
-        success: true,
-        message: 'Tutor request created successfully',
-        data: docRef.id,
-      );
-    } catch (e) {
-      throw ApiError.fromFirebaseException(e);
-    }
-  }
-
-  Future<ApiResponse<void>> bookTutorSession({
-    required String userId,
-    required String tutorId,
-    required String subject,
-    required DateTime dateTime,
-    required String duration,
-    required String platform,
-    String? description,
-  }) async {
-    try {
-      // Validate inputs
-      if (dateTime.isBefore(DateTime.now())) {
-        throw ApiError(message: 'Cannot schedule session in the past');
+      final applicationDoc = await applicationRef.get();
+      if (!applicationDoc.exists) {
+        throw ApiError(
+          message: 'Tutor application not found',
+          code: 'APPLICATION_NOT_FOUND',
+        );
       }
 
-      int durationMinutes;
-      try {
-        durationMinutes = int.parse(duration);
-        if (durationMinutes < 15) {
-          throw ApiError(
-            message: 'Session duration must be at least 15 minutes',
-          );
-        }
-      } catch (e) {
-        throw ApiError(message: 'Invalid duration format');
+      final applicationData = applicationDoc.data()!;
+      if (applicationData['type'] != 'application') {
+        throw ApiError(
+          message: 'Document is not a tutor application',
+          code: 'INVALID_TYPE',
+        );
       }
 
-      // Fetch tutor details for tutorName and tutorImage
-      final tutorDoc =
-          await FirebaseConfig.firestore
-              .collection('tutors')
-              .doc(tutorId)
-              .get();
-
-      if (!tutorDoc.exists) {
-        throw ApiError(message: 'Tutor not found');
-      }
-
-      final tutorData = tutorDoc.data()!;
-      final tutorName = tutorData['name'] ?? 'Unknown Tutor';
-      final tutorImage = tutorData['profile_picture'] ?? '';
-
-      // Validate subject
-      final subjects = List<String>.from(tutorData['subjects'] ?? []);
-      if (!subjects.contains(subject)) {
-        throw ApiError(message: 'Tutor does not teach this subject');
-      }
-
-      final sessionData = {
-        'userId': userId,
-        'tutorId': tutorId,
-        'subject': subject,
-        'start_time': Timestamp.fromDate(dateTime),
-        'duration_minutes': durationMinutes,
-        'platform': platform,
-        'description': description ?? '',
-        'status': 'pending',
-        'type': 'application',
-        'tutor_name': tutorName,
-        'tutor_image': tutorImage,
-        'participant_images': <String>[],
-        'participants': [userId],
-        'is_current_user': true,
+      final tutorData = {
+        'type': 'tutor',
+        'userId': applicationData['userId'],
+        'name': name,
+        'bio': bio,
+        'education': education,
+        'experience': experience,
+        'teaching_style': teachingStyle,
+        'rating': 0.0,
+        'sessions_completed': 0,
+        'points': 0,
+        'badges': 0,
+        'is_available': true,
+        'profile_picture':
+            profilePicture ??
+            applicationData['personal_info']['profile_picture'],
+        'subjects': List<String>.from(applicationData['subjects'] ?? []),
+        'availability': Map<String, List<String>>.from(
+          applicationData['availability'] ?? {},
+        ),
+        'preferred_teaching_mode': applicationData['teaching_mode'],
+        'preferred_venue': applicationData['venue'],
         'created_at': Timestamp.now(),
         'updated_at': Timestamp.now(),
       };
 
-      await FirebaseConfig.firestore.collection('sessions').add(sessionData);
+      await applicationRef.update(tutorData);
 
-      return ApiResponse<void>(
+      return ApiResponse<Tutor>(
         success: true,
-        message: 'Session booked successfully',
+        message: 'Tutor application approved and converted to tutor',
+        data: Tutor.fromJson({...tutorData, 'id': applicationId}),
       );
     } catch (e) {
       throw ApiError.fromFirebaseException(e);
@@ -2948,22 +2905,15 @@ class TutorRepository {
     required String userId,
     required String tutorId,
     required String subject,
-    required DateTime dateTime,
-    required int duration,
+    required DateTime startTime,
+    required int durationMinutes,
     required String platform,
-    required String description,
+    String? description,
   }) async {
     try {
-      // Validate inputs
-      if (dateTime.isBefore(DateTime.now())) {
-        throw ApiError(message: 'Cannot schedule session in the past');
-      }
+      ValidationUtil.validateSessionTiming(startTime);
+      ValidationUtil.validateDuration(durationMinutes);
 
-      if (duration < 15) {
-        throw ApiError(message: 'Session duration must be at least 15 minutes');
-      }
-
-      // Fetch tutor details for tutorName and tutorImage
       final tutorDoc =
           await FirebaseConfig.firestore
               .collection('tutors')
@@ -2971,27 +2921,38 @@ class TutorRepository {
               .get();
 
       if (!tutorDoc.exists) {
-        throw ApiError(message: 'Tutor not found');
+        throw ApiError(message: 'Tutor not found', code: 'TUTOR_NOT_FOUND');
       }
 
       final tutorData = tutorDoc.data()!;
-      final tutorName = tutorData['name'] ?? 'Unknown Tutor';
-      final tutorImage = tutorData['profile_picture'] ?? '';
+      if (tutorData['type'] != 'tutor') {
+        throw ApiError(
+          message: 'Document is not a tutor',
+          code: 'INVALID_TYPE',
+        );
+      }
+      debugPrint('Tutor data: $tutorData');
 
-      // Validate subject
+      final tutorName =
+          tutorData['personal_info']['fullName']?.toString() ?? 'Unknown Tutor';
+      final tutorImage = tutorData['profile_picture']?.toString() ?? '';
       final subjects = List<String>.from(tutorData['subjects'] ?? []);
+
       if (!subjects.contains(subject)) {
-        throw ApiError(message: 'Tutor does not teach this subject');
+        throw ApiError(
+          message: 'Tutor does not teach this subject',
+          code: 'INVALID_SUBJECT',
+        );
       }
 
       final sessionData = {
         'userId': userId,
-        'tutorId': tutorId,
-        'subject': subject,
-        'start_time': Timestamp.fromDate(dateTime),
-        'duration_minutes': duration,
+        'tutor_id': tutorId,
+        'title': subject,
+        'start_time': Timestamp.fromDate(startTime),
+        'duration_minutes': durationMinutes,
         'platform': platform,
-        'description': description,
+        'description': description?.trim() ?? '',
         'status': 'pending',
         'type': 'application',
         'tutor_name': tutorName,
@@ -3019,87 +2980,131 @@ class TutorRepository {
 }
 
 class ChatRepository {
-  Future<List<Chat>> getChats(String userId) async {
-    final snapshot =
-        await FirebaseConfig.firestore
-            .collection('users')
-            .doc(userId)
-            .collection('chats')
-            .orderBy('last_message_time', descending: true)
-            .get();
-    return snapshot.docs
-        .map((doc) => Chat.fromJson({...doc.data(), 'id': doc.id}))
-        .toList();
+  final FirebaseFirestore _firestore = FirebaseConfig.firestore;
+  static const int _messagePageSize = 20;
+
+  Future<List<Chat>> getChats(String userId, {String? lastDocId}) async {
+    try {
+      Query<Map<String, dynamic>> query = _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('chats')
+          .orderBy('last_message_time', descending: true)
+          .limit(_messagePageSize);
+
+      if (lastDocId != null) {
+        final lastDoc =
+            await _firestore
+                .collection('users')
+                .doc(userId)
+                .collection('chats')
+                .doc(lastDocId)
+                .get();
+        query = query.startAfterDocument(lastDoc);
+      }
+
+      final snapshot = await query.get();
+      return snapshot.docs.map((doc) => Chat.fromJson(doc.data())).toList();
+    } catch (e) {
+      throw _handleFirestoreError(e);
+    }
   }
 
-  Future<List<Message>> getMessages(String chatId) async {
-    final snapshot =
-        await FirebaseConfig.firestore
-            .collection('chats')
-            .doc(chatId)
-            .collection('messages')
-            .orderBy('time', descending: true)
-            .get();
-    return snapshot.docs
-        .map((doc) => Message.fromJson({...doc.data(), 'id': doc.id}))
-        .toList();
+  Future<List<Message>> getMessages(String chatId, {String? lastDocId}) async {
+    try {
+      Query<Map<String, dynamic>> query = _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .orderBy('time', descending: true)
+          .limit(_messagePageSize);
+
+      if (lastDocId != null) {
+        final lastDoc =
+            await _firestore
+                .collection('chats')
+                .doc(chatId)
+                .collection('messages')
+                .doc(lastDocId)
+                .get();
+        query = query.startAfterDocument(lastDoc);
+      }
+
+      final snapshot = await query.get();
+      return snapshot.docs.map((doc) => Message.fromJson(doc.data())).toList();
+    } catch (e) {
+      throw _handleFirestoreError(e);
+    }
   }
 
   Future<void> sendMessage(Message message) async {
     try {
-      // Save the message to the chats collection
+      final batch = _firestore.batch();
       final messageRef =
-          FirebaseConfig.firestore
+          _firestore
               .collection('chats')
               .doc(message.chatId)
               .collection('messages')
               .doc();
+
       final messageData = {
         ...message.toJson(),
         'id': messageRef.id,
         'time': FieldValue.serverTimestamp(),
       };
-      await messageRef.set(messageData);
 
-      // Update the chat's last message and timestamp for both users
+      // Set message
+      batch.set(messageRef, messageData);
+
+      // Update chat metadata
       final chatData = {
         'last_message': message.text,
         'last_message_time': FieldValue.serverTimestamp(),
       };
 
-      // Update the main chat document
-      await FirebaseConfig.firestore
-          .collection('chats')
-          .doc(message.chatId)
-          .update(chatData);
+      // Update main chat document
+      final chatRef = _firestore.collection('chats').doc(message.chatId);
+      batch.update(chatRef, chatData);
 
-      // Get the chat members
-      final chatDoc =
-          await FirebaseConfig.firestore
-              .collection('chats')
-              .doc(message.chatId)
-              .get();
+      // Get chat members
+      final chatDoc = await chatRef.get();
       final members = List<String>.from(chatDoc.data()?['members'] ?? []);
 
-      // Update each user's chat reference
+      // Update user chat references
       for (final userId in members) {
-        final userChatRef = FirebaseConfig.firestore
+        final userChatRef = _firestore
             .collection('users')
             .doc(userId)
             .collection('chats')
             .doc(message.chatId);
-        await userChatRef.update({
+
+        batch.update(userChatRef, {
           'last_message': message.text,
           'last_message_time': FieldValue.serverTimestamp(),
-          // Increment unread count for other users (not the sender)
           if (userId != message.senderId)
             'unread_count': FieldValue.increment(1),
         });
       }
+
+      await batch.commit();
     } catch (e) {
-      print('Error sending message in repository: $e');
-      rethrow;
+      throw _handleFirestoreError(e);
     }
+  }
+
+  Exception _handleFirestoreError(dynamic e) {
+    // Add specific Firestore error handling
+    if (e is FirebaseException) {
+      switch (e.code) {
+        case 'permission-denied':
+          return Exception('Permission denied accessing Firestore');
+        case 'not-found':
+          return Exception('Requested document not found');
+        default:
+          return Exception('Firestore error: ${e.message}');
+      }
+    }
+    return Exception('Unexpected error: $e');
   }
 }
 

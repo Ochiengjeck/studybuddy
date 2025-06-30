@@ -1,33 +1,80 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
+import 'package:studybuddy/utils/providers/providers.dart';
 
-class AnalyticsPage extends StatelessWidget {
+import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
+
+class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
+
+  @override
+  State<AnalyticsPage> createState() => _AnalyticsPageState();
+}
+
+class _AnalyticsPageState extends State<AnalyticsPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Load analytics data when the page is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        Provider.of<AnalyticsProvider>(
+          context,
+          listen: false,
+        ).loadAnalyticsData(userId);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 20),
-            _buildChartCard(
-              context,
-              title: 'Weekly Activity',
-              chart: _buildBarChart(),
+      body: Consumer<AnalyticsProvider>(
+        builder: (context, provider, child) {
+          if (FirebaseAuth.instance.currentUser == null) {
+            return const Center(
+              child: Text('Please log in to view analytics.'),
+            );
+          }
+
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (provider.error != null) {
+            return Center(child: Text('Error: ${provider.error}'));
+          }
+
+          final weeklyActivity = provider.weeklyActivity ?? [];
+          final subjectDistribution = provider.subjectDistribution ?? [];
+          final tutorPerformance = provider.tutorPerformance ?? [];
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                _buildChartCard(
+                  context,
+                  title: 'Weekly Activity',
+                  chart: _buildBarChart(weeklyActivity),
+                ),
+                const SizedBox(height: 16),
+                _buildChartCard(
+                  context,
+                  title: 'Subject Distribution',
+                  chart: _buildPieChart(subjectDistribution),
+                ),
+                const SizedBox(height: 16),
+                _buildTutorPerformanceTable(tutorPerformance),
+              ],
             ),
-            SizedBox(height: 16),
-            _buildChartCard(
-              context,
-              title: 'Subject Distribution',
-              chart: _buildPieChart(),
-            ),
-            SizedBox(height: 16),
-            _buildTutorPerformanceTable(),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -39,15 +86,15 @@ class AnalyticsPage extends StatelessWidget {
   }) {
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             SizedBox(height: 200, child: chart),
           ],
         ),
@@ -55,11 +102,38 @@ class AnalyticsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildBarChart() {
+  Widget _buildBarChart(List<WeeklyActivity> activities) {
+    // Map days to indices for consistency
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final barGroups = List.generate(7, (index) {
+      final activity = activities.firstWhere(
+        (act) => act.day == days[index],
+        orElse:
+            () => WeeklyActivity(day: days[index], sessions: 0, duration: 0),
+      );
+      return BarChartGroupData(
+        x: index,
+        barRods: [
+          BarChartRodData(
+            toY: activity.sessions.toDouble(),
+            color: Colors.blue,
+            width: 16,
+          ),
+        ],
+      );
+    });
+
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: 10,
+        maxY:
+            activities.isNotEmpty
+                ? activities
+                        .map((e) => e.sessions)
+                        .reduce((a, b) => a > b ? a : b)
+                        .toDouble() +
+                    2
+                : 10,
         barTouchData: BarTouchData(enabled: false),
         titlesData: FlTitlesData(
           show: true,
@@ -67,7 +141,6 @@ class AnalyticsPage extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               getTitlesWidget: (value, meta) {
-                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                 return Padding(
                   padding: const EdgeInsets.only(top: 8.0),
                   child: Text(days[value.toInt()]),
@@ -85,125 +158,96 @@ class AnalyticsPage extends StatelessWidget {
               },
             ),
           ),
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
         ),
         gridData: FlGridData(show: true),
         borderData: FlBorderData(show: false),
-        barGroups: [
-          BarChartGroupData(
-            x: 0,
-            barRods: [BarChartRodData(toY: 5, color: Colors.blue, width: 16)],
-          ),
-          BarChartGroupData(
-            x: 1,
-            barRods: [BarChartRodData(toY: 7, color: Colors.blue, width: 16)],
-          ),
-          BarChartGroupData(
-            x: 2,
-            barRods: [BarChartRodData(toY: 3, color: Colors.blue, width: 16)],
-          ),
-          BarChartGroupData(
-            x: 3,
-            barRods: [BarChartRodData(toY: 8, color: Colors.blue, width: 16)],
-          ),
-          BarChartGroupData(
-            x: 4,
-            barRods: [BarChartRodData(toY: 4, color: Colors.blue, width: 16)],
-          ),
-          BarChartGroupData(
-            x: 5,
-            barRods: [BarChartRodData(toY: 2, color: Colors.blue, width: 16)],
-          ),
-          BarChartGroupData(
-            x: 6,
-            barRods: [BarChartRodData(toY: 0, color: Colors.blue, width: 16)],
-          ),
-        ],
+        barGroups: barGroups,
       ),
     );
   }
 
-  Widget _buildPieChart() {
+  Widget _buildPieChart(List<SubjectDistribution> distributions) {
     return PieChart(
       PieChartData(
         sectionsSpace: 2,
         centerSpaceRadius: 40,
-        sections: [
-          PieChartSectionData(
-            color: Colors.blue,
-            value: 25,
-            title: 'Math',
-            radius: 60,
-            titleStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          PieChartSectionData(
-            color: Colors.green,
-            value: 20,
-            title: 'Science',
-            radius: 60,
-            titleStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          PieChartSectionData(
-            color: Colors.amber,
-            value: 15,
-            title: 'English',
-            radius: 60,
-            titleStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          PieChartSectionData(
-            color: Colors.purple,
-            value: 10,
-            title: 'History',
-            radius: 60,
-            titleStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-        ],
+        sections:
+            distributions.isNotEmpty
+                ? distributions.map((dist) {
+                  return PieChartSectionData(
+                    color: dist.color,
+                    value: dist.count.toDouble(),
+                    title: dist.subject,
+                    radius: 60,
+                    titleStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  );
+                }).toList()
+                : [
+                  PieChartSectionData(
+                    color: Colors.grey,
+                    value: 100,
+                    title: 'No Data',
+                    radius: 60,
+                    titleStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
       ),
     );
   }
 
-  Widget _buildTutorPerformanceTable() {
+  Widget _buildTutorPerformanceTable(List<TutorPerformance> performances) {
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Tutor Performance',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             DataTable(
-              columns: [
+              columns: const [
                 DataColumn(label: Text('Tutor')),
                 DataColumn(label: Text('Sessions')),
                 DataColumn(label: Text('Rating')),
                 DataColumn(label: Text('Points')),
               ],
-              rows: [
-                _buildDataRow('Sarah Johnson', '42', '4.9', '3120'),
-                _buildDataRow('Michael Chen', '38', '4.8', '2450'),
-                _buildDataRow('David Lee', '35', '4.7', '2210'),
-                _buildDataRow('Emily Rodriguez', '28', '4.6', '1980'),
-              ],
+              rows:
+                  performances.isNotEmpty
+                      ? performances.map((perf) {
+                        return _buildDataRow(
+                          perf.name,
+                          perf.sessions.toString(),
+                          perf.rating.toStringAsFixed(1),
+                          perf.points.toString(),
+                        );
+                      }).toList()
+                      : [
+                        const DataRow(
+                          cells: [
+                            DataCell(Text('No Data')),
+                            DataCell(Text('')),
+                            DataCell(Text('')),
+                            DataCell(Text('')),
+                          ],
+                        ),
+                      ],
             ),
           ],
         ),
@@ -224,8 +268,8 @@ class AnalyticsPage extends StatelessWidget {
         DataCell(
           Row(
             children: [
-              Icon(Icons.star, color: Colors.amber, size: 16),
-              SizedBox(width: 4),
+              const Icon(Icons.star, color: Colors.amber, size: 16),
+              const SizedBox(width: 4),
               Text(rating),
             ],
           ),

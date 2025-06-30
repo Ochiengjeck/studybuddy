@@ -1,65 +1,89 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class StudyMaterialsPage extends StatelessWidget {
+import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../../../utils/providers/providers.dart';
+
+class StudyMaterialsPage extends StatefulWidget {
   const StudyMaterialsPage({super.key});
 
   @override
+  _StudyMaterialsPageState createState() => _StudyMaterialsPageState();
+}
+
+class _StudyMaterialsPageState extends State<StudyMaterialsPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        Provider.of<StudyMaterialsProvider>(
+          context,
+          listen: false,
+        ).loadStudyMaterials(userId);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: EdgeInsets.all(16),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.8,
+    return Consumer<StudyMaterialsProvider>(
+      builder: (context, provider, child) {
+        if (FirebaseAuth.instance.currentUser == null) {
+          return const Scaffold(
+            body: Center(child: Text('Please log in to view study materials.')),
+          );
+        }
+
+        if (provider.isLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (provider.error != null) {
+          return Scaffold(
+            body: Center(child: Text('Error: ${provider.error}')),
+          );
+        }
+
+        final materials = provider.studyMaterials ?? [];
+
+        return Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.8,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) =>
+                        _buildMaterialCard(context, materials[index]),
+                    childCount: materials.length,
+                  ),
+                ),
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildMaterialCard(context, index),
-                childCount: 6,
-              ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildMaterialCard(BuildContext context, int index) {
-    final subjects = [
-      'Mathematics',
-      'Physics',
-      'Chemistry',
-      'Biology',
-      'Computer Science',
-      'English',
-    ];
-    final colors = [
-      Colors.blue,
-      Colors.red,
-      Colors.green,
-      Colors.purple,
-      Colors.orange,
-      Colors.teal,
-    ];
-    final icons = [
-      Icons.calculate,
-      Icons.science,
-      Icons.eco,
-      Icons.biotech,
-      Icons.code,
-      Icons.menu_book,
-    ];
-
+  Widget _buildMaterialCard(BuildContext context, StudyMaterial material) {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {},
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -67,26 +91,29 @@ class StudyMaterialsPage extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: colors[index].withOpacity(0.2),
+                  color: material.color.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icons[index], color: colors[index]),
+                child: Icon(material.icon, color: material.color),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
-                subjects[index],
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                material.subject,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
-                '${(index + 3) * 5} resources available',
-                style: TextStyle(color: Colors.grey),
+                '${material.resourceCount} resources available',
+                style: const TextStyle(color: Colors.grey),
               ),
-              Spacer(),
+              const Spacer(),
               LinearProgressIndicator(
-                value: (index + 1) * 0.15,
-                backgroundColor: colors[index].withOpacity(0.2),
-                color: colors[index],
+                value: material.progress,
+                backgroundColor: material.color.withOpacity(0.2),
+                color: material.color,
               ),
             ],
           ),

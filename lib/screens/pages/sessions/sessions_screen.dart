@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:studybuddy/screens/pages/tutors/apply_tutor/apply_tutor_flow.dart';
 import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
 import '../../../utils/providers/providers.dart';
 import '../../../widgets/session_card.dart';
@@ -21,6 +23,7 @@ class _SessionsScreenState extends State<SessionsScreen>
   late TabController _tabController;
   late SessionProvider _sessionProvider;
   late String _userId;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
@@ -32,12 +35,33 @@ class _SessionsScreenState extends State<SessionsScreen>
 
     // Load initial data
     _loadSessions();
+
+    // Set up periodic refresh every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _loadSessions(forceRefresh: true);
+    });
   }
 
-  Future<void> _loadSessions() async {
-    await _sessionProvider.loadUpcomingSessions(_userId);
-    await _sessionProvider.loadPastSessions(_userId);
-    await _sessionProvider.loadPendingSessions(_userId);
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadSessions({bool forceRefresh = false}) async {
+    await _sessionProvider.loadUpcomingSessions(
+      _userId,
+      forceRefresh: forceRefresh,
+    );
+    await _sessionProvider.loadPastSessions(
+      _userId,
+      forceRefresh: forceRefresh,
+    );
+    await _sessionProvider.loadPendingSessions(
+      _userId,
+      forceRefresh: forceRefresh,
+    );
   }
 
   void _navigateToSessionScreen(Session session) {
@@ -79,21 +103,187 @@ class _SessionsScreenState extends State<SessionsScreen>
   }
 
   void _navigateToOrganizeSession() {
+    if (Provider.of<AppProvider>(
+          context,
+          listen: false,
+        ).currentUser?.userType ==
+        'student') {
+      _showModernAccessDialog();
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const OrganizeSessionScreen()),
     );
   }
 
+  void _showModernAccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 300),
+            tween: Tween(begin: 0.0, end: 1.0),
+            curve: Curves.elasticOut,
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: value,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 20,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icon with animated background
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.1),
+                              Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.2),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                        child: Icon(
+                          Icons.school_outlined,
+                          size: 40,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Title
+                      Text(
+                        'Tutors Only',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Description
+                      Text(
+                        'This feature is exclusively available for tutors to organize and manage their sessions.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.7),
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Action buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Got it',
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ApplyTutorFlow(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Become Tutor',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildSessionList(List<Session>? sessions) {
     if (sessions == null || sessions.isEmpty) {
-      return Center(
-        child: Column(
-          children: [
-            Image.asset('assets/no_session.png', height: 150),
-            Text('No sessions found'),
-          ],
-        ),
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset('assets/no_session.png', height: 210),
+          const Text('No sessions found'),
+        ],
       );
     }
 
@@ -147,10 +337,6 @@ class _SessionsScreenState extends State<SessionsScreen>
           Expanded(
             child: Consumer<SessionProvider>(
               builder: (context, sessionProvider, _) {
-                if (sessionProvider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
                 if (sessionProvider.error != null) {
                   return Center(child: Text('Error: ${sessionProvider.error}'));
                 }
@@ -185,7 +371,7 @@ class _SessionsScreenState extends State<SessionsScreen>
           FloatingActionButton.extended(
             onPressed: _navigateToOrganizeSession,
             heroTag: "organize_session",
-            label: const Text('Organize Session'),
+            label: const Text('Set Session'),
             icon: const Icon(Icons.add_circle),
             backgroundColor: Theme.of(context).colorScheme.primary,
           ),

@@ -177,6 +177,7 @@ class _ApplyForSessionScreenState extends State<ApplyForSessionScreen>
         'level': _selectedLevel,
         'description': _descriptionController.text,
         'preferredDateTime': Timestamp.fromDate(_preferredDateTime!),
+        'start_time': Timestamp.fromDate(_preferredDateTime!),
         'duration': _preferredDuration.inMinutes,
         'platform': _selectedPlatform,
         'notes': _notesController.text,

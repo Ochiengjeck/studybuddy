@@ -1,7 +1,31 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class SavedItemsPage extends StatelessWidget {
+import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
+import '../../../utils/providers/providers.dart';
+
+class SavedItemsPage extends StatefulWidget {
   const SavedItemsPage({super.key});
+
+  @override
+  _SavedItemsPageState createState() => _SavedItemsPageState();
+}
+
+class _SavedItemsPageState extends State<SavedItemsPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        Provider.of<SavedItemsProvider>(
+          context,
+          listen: false,
+        ).loadSavedItems(userId);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -9,7 +33,7 @@ class SavedItemsPage extends StatelessWidget {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          bottom: TabBar(
+          bottom: const TabBar(
             tabs: [
               Tab(text: 'Sessions'),
               Tab(text: 'Materials'),
@@ -17,85 +41,72 @@ class SavedItemsPage extends StatelessWidget {
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            _buildSavedSessions(),
-            _buildSavedMaterials(),
-            _buildSavedTests(),
-          ],
+        body: Consumer<SavedItemsProvider>(
+          builder: (context, provider, child) {
+            if (FirebaseAuth.instance.currentUser == null) {
+              return const Center(
+                child: Text('Please log in to view saved items.'),
+              );
+            }
+
+            if (provider.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (provider.error != null) {
+              return Center(child: Text('Error: ${provider.error}'));
+            }
+
+            final sessions = provider.savedSessions ?? [];
+            final materials = provider.savedMaterials ?? [];
+            final tests = provider.savedTests ?? [];
+
+            return TabBarView(
+              children: [
+                _buildSavedSessions(sessions),
+                _buildSavedMaterials(materials),
+                _buildSavedTests(tests),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildSavedSessions() {
+  Widget _buildSavedSessions(List<SavedItem> sessions) {
     return ListView(
-      padding: EdgeInsets.all(16),
-      children: [
-        _buildSavedItem(
-          icon: Icons.video_library,
-          title: 'Calculus Review Session',
-          subtitle: 'Saved Oct 12, 2023',
-          type: 'Session',
-        ),
-        _buildSavedItem(
-          icon: Icons.video_library,
-          title: 'Python Data Structures',
-          subtitle: 'Saved Oct 5, 2023',
-          type: 'Session',
-        ),
-      ],
+      padding: const EdgeInsets.all(16),
+      children:
+          sessions.isEmpty
+              ? [const Center(child: Text('No saved sessions'))]
+              : sessions.map((item) => _buildSavedItem(item)).toList(),
     );
   }
 
-  Widget _buildSavedMaterials() {
+  Widget _buildSavedMaterials(List<SavedItem> materials) {
     return ListView(
-      padding: EdgeInsets.all(16),
-      children: [
-        _buildSavedItem(
-          icon: Icons.article,
-          title: 'Organic Chemistry Notes',
-          subtitle: 'PDF • 2.4MB',
-          type: 'Material',
-        ),
-        _buildSavedItem(
-          icon: Icons.article,
-          title: 'Linear Algebra Cheat Sheet',
-          subtitle: 'PDF • 1.1MB',
-          type: 'Material',
-        ),
-      ],
+      padding: const EdgeInsets.all(16),
+      children:
+          materials.isEmpty
+              ? [const Center(child: Text('No saved materials'))]
+              : materials.map((item) => _buildSavedItem(item)).toList(),
     );
   }
 
-  Widget _buildSavedTests() {
+  Widget _buildSavedTests(List<SavedItem> tests) {
     return ListView(
-      padding: EdgeInsets.all(16),
-      children: [
-        _buildSavedItem(
-          icon: Icons.quiz,
-          title: 'Physics Practice Test',
-          subtitle: '20 questions • 25 mins',
-          type: 'Test',
-        ),
-        _buildSavedItem(
-          icon: Icons.quiz,
-          title: 'English Literature Quiz',
-          subtitle: '15 questions • 20 mins',
-          type: 'Test',
-        ),
-      ],
+      padding: const EdgeInsets.all(16),
+      children:
+          tests.isEmpty
+              ? [const Center(child: Text('No saved tests'))]
+              : tests.map((item) => _buildSavedItem(item)).toList(),
     );
   }
 
-  Widget _buildSavedItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String type,
-  }) {
+  Widget _buildSavedItem(SavedItem item) {
     return Card(
-      margin: EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 16),
       child: ListTile(
         leading: Container(
           width: 48,
@@ -104,17 +115,39 @@ class SavedItemsPage extends StatelessWidget {
             color: Colors.blue.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: Colors.blue),
+          child: Icon(item.icon, color: Colors.blue),
         ),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: PopupMenuButton(
-          icon: Icon(Icons.more_vert),
+        title: Text(item.title),
+        subtitle: Text(item.subtitle),
+        trailing: PopupMenuButton<String>(
           itemBuilder:
               (context) => [
-                PopupMenuItem(child: Text('Remove from saved')),
-                PopupMenuItem(child: Text('Share')),
+                const PopupMenuItem(
+                  value: 'remove',
+                  child: Text('Remove from saved'),
+                ),
+                const PopupMenuItem(value: 'share', child: Text('Share')),
               ],
+          onSelected: (value) async {
+            if (value == 'remove') {
+              final userId = FirebaseAuth.instance.currentUser?.uid;
+              if (userId != null) {
+                try {
+                  await Provider.of<SavedItemsProvider>(
+                    context,
+                    listen: false,
+                  ).removeSavedItem(userId, item.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Item removed successfully')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to remove item: $e')),
+                  );
+                }
+              }
+            }
+          },
         ),
       ),
     );

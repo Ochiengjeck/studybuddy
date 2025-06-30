@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'log_in.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -14,33 +14,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final List<TextEditingController> _otpControllers = List.generate(
-    6,
-    (index) => TextEditingController(),
-  );
-  final List<FocusNode> _otpFocusNodes = List.generate(
-    6,
-    (index) => FocusNode(),
-  );
 
   bool _isLoading = false;
-  bool _isOtpSent = false;
-  bool _isOtpVerified = false;
+  bool _isEmailSent = false;
+  bool _isEmailVerified = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  int _resendTimer = 0;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    for (var controller in _otpControllers) {
-      controller.dispose();
-    }
-    for (var node in _otpFocusNodes) {
-      node.dispose();
-    }
     super.dispose();
   }
 
@@ -71,10 +56,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     SizedBox(height: size.height * 0.05),
                     _buildHeaderSection(theme),
                     SizedBox(height: size.height * 0.05),
-                    if (!_isOtpSent)
+                    if (!_isEmailSent)
                       _buildEmailForm(theme)
-                    else if (!_isOtpVerified)
-                      _buildOtpForm(theme)
+                    else if (!_isEmailVerified)
+                      _buildEmailSentMessage(theme)
                     else
                       _buildPasswordResetForm(theme),
                     const Spacer(),
@@ -94,14 +79,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     String subtitle;
     IconData icon;
 
-    if (!_isOtpSent) {
+    if (!_isEmailSent) {
       title = 'Forgot Password?';
-      subtitle = 'Enter your email to receive an OTP';
+      subtitle = 'Enter your email to receive a password reset link';
       icon = Icons.lock_reset_rounded;
-    } else if (!_isOtpVerified) {
-      title = 'Verify OTP';
-      subtitle = 'Enter the 6-digit code sent to ${_emailController.text}';
-      icon = Icons.verified_user_rounded;
+    } else if (!_isEmailVerified) {
+      title = 'Check Your Email';
+      subtitle =
+          'A password reset link has been sent to ${_emailController.text}';
+      icon = Icons.email_rounded;
     } else {
       title = 'Reset Password';
       subtitle = 'Create your new password';
@@ -145,7 +131,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         children: [
           _buildEmailField(theme),
           const SizedBox(height: 32),
-          _buildSendOtpButton(theme),
+          _buildSendEmailButton(theme),
         ],
       ),
     );
@@ -205,7 +191,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildSendOtpButton(ThemeData theme) {
+  Widget _buildSendEmailButton(ThemeData theme) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -214,7 +200,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ? null
                 : () {
                   if (_formKey.currentState!.validate()) {
-                    _sendOtp();
+                    _sendPasswordResetEmail();
                   }
                 },
         style: ElevatedButton.styleFrom(
@@ -237,7 +223,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 )
                 : Text(
-                  'Send OTP',
+                  'Send Reset Link',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -246,140 +232,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildOtpForm(ThemeData theme) {
+  Widget _buildEmailSentMessage(ThemeData theme) {
     return Column(
       children: [
-        _buildOtpFields(theme),
-        const SizedBox(height: 24),
-        _buildResendOtpSection(theme),
-        const SizedBox(height: 32),
-        _buildVerifyOtpButton(theme),
-      ],
-    );
-  }
-
-  Widget _buildOtpFields(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
         Text(
-          'Enter OTP',
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(6, (index) {
-            return SizedBox(
-              width: 50,
-              height: 60,
-              child: TextFormField(
-                controller: _otpControllers[index],
-                focusNode: _otpFocusNodes[index],
-                textAlign: TextAlign.center,
-                keyboardType: TextInputType.number,
-                maxLength: 1,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                onChanged: (value) {
-                  if (value.isNotEmpty && index < 5) {
-                    _otpFocusNodes[index + 1].requestFocus();
-                  } else if (value.isEmpty && index > 0) {
-                    _otpFocusNodes[index - 1].requestFocus();
-                  }
-                },
-                decoration: InputDecoration(
-                  counterText: '',
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest
-                      .withOpacity(0.3),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: theme.colorScheme.primary,
-                      width: 2,
-                    ),
-                  ),
-                ),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildResendOtpSection(ThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          "Didn't receive the code? ",
-          style: theme.textTheme.bodyMedium?.copyWith(
+          'Please check your email inbox (or spam/junk folder) for a password reset link. Follow the instructions in the email to reset your password.',
+          style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurface.withOpacity(0.7),
           ),
+          textAlign: TextAlign.center,
         ),
-        if (_resendTimer > 0)
-          Text(
-            'Resend in ${_resendTimer}s',
+        const SizedBox(height: 24),
+        TextButton(
+          onPressed: _isLoading ? null : _sendPasswordResetEmail,
+          child: Text(
+            'Resend Email',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
-            ),
-          )
-        else
-          TextButton(
-            onPressed: _sendOtp,
-            child: Text(
-              'Resend',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
             ),
           ),
-      ],
-    );
-  }
-
-  Widget _buildVerifyOtpButton(ThemeData theme) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _verifyOtp,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 0,
         ),
-        child:
-            _isLoading
-                ? SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: theme.colorScheme.onPrimary,
-                  ),
-                )
-                : Text(
-                  'Verify OTP',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-      ),
+      ],
     );
   }
 
@@ -470,6 +344,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
+
         const SizedBox(height: 8),
         TextFormField(
           controller: _confirmPasswordController,
@@ -586,80 +461,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Future<void> _sendOtp() async {
+  Future<void> _sendPasswordResetEmail() async {
     setState(() => _isLoading = true);
     try {
-      // Simulate API call to send OTP
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        setState(() {
-          _isOtpSent = true;
-          _isLoading = false;
-        });
-
-        _startResendTimer();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('OTP sent to ${_emailController.text}'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send OTP: ${e.toString()}'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _verifyOtp() async {
-    final otp = _otpControllers.map((controller) => controller.text).join();
-
-    if (otp.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter the complete 6-digit OTP'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Theme.of(context).colorScheme.error,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text.trim(),
       );
-      return;
-    }
 
-    setState(() => _isLoading = true);
-    try {
-      // Simulate API call to verify OTP
-      await Future.delayed(const Duration(seconds: 2));
-
-      // For demo purposes, accept any 6-digit OTP
-      // In real implementation, verify with your backend
       if (mounted) {
         setState(() {
-          _isOtpVerified = true;
+          _isEmailSent = true;
           _isLoading = false;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('OTP verified successfully'),
+            content: Text(
+              'Password reset link sent to ${_emailController.text}',
+            ),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Colors.green,
             shape: RoundedRectangleBorder(
@@ -673,7 +492,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Invalid OTP: ${e.toString()}'),
+            content: Text('Failed to send reset link: ${e.toString()}'),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Theme.of(context).colorScheme.error,
             shape: RoundedRectangleBorder(
@@ -688,8 +507,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _resetPassword() async {
     setState(() => _isLoading = true);
     try {
-      // Simulate API call to reset password
-      await Future.delayed(const Duration(seconds: 2));
+      // Since Firebase handles password reset via email link, this step is typically handled outside the app.
+      // For completeness, we'll simulate updating the password here, assuming the user has verified the link.
+      // In a real app, the password reset link would direct to a web page or deep link to this screen.
+      await FirebaseAuth.instance.currentUser?.updatePassword(
+        _passwordController.text.trim(),
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -703,7 +526,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         );
 
-        // Navigate back to login screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -724,18 +546,5 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         );
       }
     }
-  }
-
-  void _startResendTimer() {
-    setState(() => _resendTimer = 60);
-
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) {
-        setState(() => _resendTimer--);
-        return _resendTimer > 0;
-      }
-      return false;
-    });
   }
 }

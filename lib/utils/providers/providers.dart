@@ -6,6 +6,71 @@ import 'package:provider/single_child_widget.dart';
 
 import '../modelsAndRepsositories/models_and_repositories.dart';
 
+/// Extension to create a copy of Session with updated fields
+extension SessionExtension on Session {
+  Session copyWith({
+    String? id,
+    String? title,
+    String? tutorName,
+    String? tutorImage,
+    String? platform,
+    DateTime? startTime,
+    Duration? duration,
+    String? description,
+    SessionStatus? status,
+    SessionType? type,
+    double? rating,
+    String? review,
+    List<String>? participantImages,
+    List<String>? participants,
+    bool? isCurrentUser,
+    String? userId,
+    String? organizerId,
+    String? subject,
+    String? level,
+    String? notes,
+    int? maxParticipants,
+    int? currentParticipants,
+    bool? isRecurring,
+    String? recurringPattern,
+    bool? isPaid,
+    double? price,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Session(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      tutorName: tutorName ?? this.tutorName,
+      tutorImage: tutorImage ?? this.tutorImage,
+      platform: platform ?? this.platform,
+      startTime: startTime ?? this.startTime,
+      duration: duration ?? this.duration,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      type: type ?? this.type,
+      rating: rating ?? this.rating,
+      review: review ?? this.review,
+      participantImages: participantImages ?? this.participantImages,
+      participants: participants ?? this.participants,
+      isCurrentUser: isCurrentUser ?? this.isCurrentUser,
+      userId: userId ?? this.userId,
+      organizerId: organizerId ?? this.organizerId,
+      subject: subject ?? this.subject,
+      level: level ?? this.level,
+      notes: notes ?? this.notes,
+      maxParticipants: maxParticipants ?? this.maxParticipants,
+      currentParticipants: currentParticipants ?? this.currentParticipants,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurringPattern: recurringPattern ?? this.recurringPattern,
+      isPaid: isPaid ?? this.isPaid,
+      price: price ?? this.price,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
 /// Base provider class with common functionality
 abstract class BaseProvider extends ChangeNotifier {
   bool _isLoading = false;
@@ -87,7 +152,7 @@ extension UserExtension on User {
     DateTime? dateJoined,
     DateTime? lastLogin,
     String? userType,
-    Map<String, dynamic>? notificationSettings, // Add this
+    Map<String, dynamic>? notificationSettings,
   }) {
     return User(
       id: id ?? this.id,
@@ -207,7 +272,6 @@ class AchievementsProvider extends BaseProvider {
     if (!forceRefresh &&
         _achievements != null &&
         isCacheValid(const Duration(minutes: 5))) {
-      debugPrint('Using cached achievements: ${_achievements!.length}');
       return;
     }
 
@@ -219,10 +283,8 @@ class AchievementsProvider extends BaseProvider {
       final response = await _repository.getAchievements(userId);
       _achievements = response.data;
       _lastFetched = DateTime.now();
-      debugPrint('Achievements loaded: ${_achievements?.length ?? 0}');
     } on ApiError catch (e) {
       _error = e.message;
-      debugPrint('Error loading achievements: ${e.message}');
       rethrow;
     } finally {
       _isLoading = false;
@@ -299,7 +361,6 @@ class LeaderboardProvider extends BaseProvider {
         _currentFilter == filter &&
         isCacheValid(const Duration(minutes: 5)) &&
         !_hasMore) {
-      debugPrint('Using cached leaderboard: ${_leaderboard!.length} users');
       return;
     }
 
@@ -323,10 +384,8 @@ class LeaderboardProvider extends BaseProvider {
       _lastDocument = response.metadata?['lastDocument'];
       _hasMore = response.data?.length == 10;
       _lastFetched = DateTime.now();
-      debugPrint('Leaderboard loaded: ${_leaderboard!.length} users');
     } on ApiError catch (e) {
       _error = e.message;
-      debugPrint('Error loading leaderboard: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -338,9 +397,6 @@ class LeaderboardProvider extends BaseProvider {
     if (!forceRefresh &&
         _topPerformers != null &&
         isCacheValid(const Duration(minutes: 5))) {
-      debugPrint(
-        'Using cached top performers: ${_topPerformers!.length} users',
-      );
       return;
     }
 
@@ -352,10 +408,8 @@ class LeaderboardProvider extends BaseProvider {
       final response = await _repository.getTopPerformers();
       _topPerformers = response.data;
       _lastFetched = DateTime.now();
-      debugPrint('Top performers loaded: ${_topPerformers!.length} users');
     } on ApiError catch (e) {
       _error = e.message;
-      debugPrint('Error loading top performers: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -387,8 +441,9 @@ class SessionProvider extends BaseProvider {
   }) async {
     if (!forceRefresh &&
         _upcomingSessions != null &&
-        isCacheValid(const Duration(minutes: 5)))
+        isCacheValid(const Duration(minutes: 5))) {
       return;
+    }
 
     _isLoading = true;
     clearError();
@@ -398,8 +453,10 @@ class SessionProvider extends BaseProvider {
       final response = await _repository.getUpcomingSessions(userId);
       _upcomingSessions = response.data;
       _lastFetched = DateTime.now();
+      debugPrint('Upcoming sessions loaded: ${_upcomingSessions?.length ?? 0}');
     } on ApiError catch (e) {
       _error = e.message;
+      debugPrint('Error loading upcoming sessions: ${e.message}');
       rethrow;
     } finally {
       _isLoading = false;
@@ -413,8 +470,9 @@ class SessionProvider extends BaseProvider {
   }) async {
     if (!forceRefresh &&
         _pastSessions != null &&
-        isCacheValid(const Duration(minutes: 5)))
+        isCacheValid(const Duration(minutes: 5))) {
       return;
+    }
 
     _isLoading = true;
     clearError();
@@ -424,10 +482,13 @@ class SessionProvider extends BaseProvider {
       final response = await _repository.getPastSessions(userId);
       _pastSessions = response.data;
       _lastFetched = DateTime.now();
+      debugPrint('Past sessions loaded: ${_pastSessions?.length ?? 0}');
     } on ApiError catch (e) {
       _error = e.message;
+      debugPrint('Error loading past sessions: ${e.message}');
       rethrow;
     } finally {
+      debugPrint('Past sessions loaded: ${_pastSessions?.length ?? 0}');
       _isLoading = false;
       notifyListeners();
     }
@@ -439,8 +500,9 @@ class SessionProvider extends BaseProvider {
   }) async {
     if (!forceRefresh &&
         _pendingSessions != null &&
-        isCacheValid(const Duration(minutes: 5)))
+        isCacheValid(const Duration(minutes: 5))) {
       return;
+    }
 
     _isLoading = true;
     clearError();
@@ -450,10 +512,13 @@ class SessionProvider extends BaseProvider {
       final response = await _repository.getPendingSessions(userId);
       _pendingSessions = response.data;
       _lastFetched = DateTime.now();
+      debugPrint('Pending sessions loaded: ${_pendingSessions?.length ?? 0}');
     } on ApiError catch (e) {
       _error = e.message;
+      debugPrint('Error loading pending sessions: ${e.message}');
       rethrow;
     } finally {
+      debugPrint('Pending sessions loaded: ${_pendingSessions?.length ?? 0}');
       _isLoading = false;
       notifyListeners();
     }
@@ -484,6 +549,10 @@ class SessionProvider extends BaseProvider {
     try {
       await _repository.cancelSession(userId, sessionId);
       _upcomingSessions?.removeWhere((session) => session.id == sessionId);
+      _pendingSessions?.removeWhere((session) => session.id == sessionId);
+      if (_selectedSession?.id == sessionId) {
+        _selectedSession = null;
+      }
     } on ApiError catch (e) {
       _error = e.message;
       rethrow;
@@ -496,15 +565,16 @@ class SessionProvider extends BaseProvider {
   Future<void> rescheduleSession(
     String userId,
     String sessionId,
-    DateTime newStartTime,
+    DateTime startTime,
   ) async {
     _isLoading = true;
     clearError();
     notifyListeners();
 
     try {
-      await _repository.rescheduleSession(userId, sessionId, newStartTime);
-      _updateSessionTime(sessionId, newStartTime);
+      ValidationUtil.validateSessionTiming(startTime);
+      await _repository.rescheduleSession(userId, sessionId, startTime);
+      _updateSessionTime(sessionId, startTime);
     } on ApiError catch (e) {
       _error = e.message;
       rethrow;
@@ -525,6 +595,7 @@ class SessionProvider extends BaseProvider {
     notifyListeners();
 
     try {
+      ValidationUtil.validateRating(rating);
       await _repository.submitFeedback(userId, sessionId, rating, review);
       _updateSessionAfterFeedback(sessionId, rating, review);
     } on ApiError catch (e) {
@@ -542,7 +613,7 @@ class SessionProvider extends BaseProvider {
     required String subject,
     required String level,
     required String description,
-    required DateTime preferredDateTime,
+    required DateTime startTime,
     required Duration duration,
     required String platform,
     String? notes,
@@ -552,18 +623,20 @@ class SessionProvider extends BaseProvider {
     notifyListeners();
 
     try {
+      ValidationUtil.validateSessionTiming(startTime);
+      ValidationUtil.validateDuration(duration.inMinutes);
       final response = await _repository.applyForSession(
         userId: userId,
         title: title,
         subject: subject,
         level: level,
         description: description,
-        preferredDateTime: preferredDateTime,
+        startTime: startTime,
         duration: duration,
         platform: platform,
         notes: notes,
       );
-      _pendingSessions?.add(response.data!);
+      _pendingSessions = [...?_pendingSessions, response.data!];
       return response.data!;
     } on ApiError catch (e) {
       _error = e.message;
@@ -580,7 +653,7 @@ class SessionProvider extends BaseProvider {
     required String subject,
     required String level,
     required String description,
-    required DateTime scheduledDateTime,
+    required DateTime startTime,
     required Duration duration,
     required String platform,
     required int maxParticipants,
@@ -594,13 +667,17 @@ class SessionProvider extends BaseProvider {
     notifyListeners();
 
     try {
+      ValidationUtil.validateSessionTiming(startTime);
+      ValidationUtil.validateDuration(duration.inMinutes);
+      ValidationUtil.validateMaxParticipants(maxParticipants);
+      ValidationUtil.validatePrice(isPaid, price);
       final response = await _repository.organizeSession(
         userId: userId,
         title: title,
         subject: subject,
         level: level,
         description: description,
-        scheduledDateTime: scheduledDateTime,
+        startTime: startTime,
         duration: duration,
         platform: platform,
         maxParticipants: maxParticipants,
@@ -609,7 +686,7 @@ class SessionProvider extends BaseProvider {
         isPaid: isPaid,
         price: price,
       );
-      _upcomingSessions?.add(response.data!);
+      _upcomingSessions = [...?_upcomingSessions, response.data!];
       return response.data!;
     } on ApiError catch (e) {
       _error = e.message;
@@ -629,8 +706,9 @@ class SessionProvider extends BaseProvider {
   }) async {
     if (!forceRefresh &&
         _availableSessions != null &&
-        isCacheValid(const Duration(minutes: 5)))
+        isCacheValid(const Duration(minutes: 5))) {
       return;
+    }
 
     _isLoading = true;
     clearError();
@@ -661,11 +739,17 @@ class SessionProvider extends BaseProvider {
 
     try {
       await _repository.joinSession(userId, sessionId);
-      if (_availableSessions != null && _upcomingSessions != null) {
-        final session = _availableSessions!.firstWhere(
-          (s) => s.id == sessionId,
-        );
-        _upcomingSessions!.add(session);
+      final sessionResponse = await _repository.getSessionDetails(
+        userId,
+        sessionId,
+      );
+      final session = sessionResponse.data;
+      if (session != null) {
+        _upcomingSessions = [...?_upcomingSessions, session];
+        _availableSessions =
+            _availableSessions
+                ?.map((s) => s.id == sessionId ? session : s)
+                .toList();
       }
     } on ApiError catch (e) {
       _error = e.message;
@@ -684,6 +768,17 @@ class SessionProvider extends BaseProvider {
     try {
       await _repository.leaveSession(userId, sessionId);
       _upcomingSessions?.removeWhere((session) => session.id == sessionId);
+      final sessionResponse = await _repository.getSessionDetails(
+        userId,
+        sessionId,
+      );
+      final session = sessionResponse.data;
+      if (session != null) {
+        _availableSessions =
+            _availableSessions
+                ?.map((s) => s.id == sessionId ? session : s)
+                .toList();
+      }
     } on ApiError catch (e) {
       _error = e.message;
       rethrow;
@@ -710,13 +805,16 @@ class SessionProvider extends BaseProvider {
     loadAvailableSessions(forceRefresh: true);
   }
 
-  void _updateSessionTime(String sessionId, DateTime newStartTime) {
+  void _updateSessionTime(String sessionId, DateTime startTime) {
     _upcomingSessions =
         _upcomingSessions
             ?.map(
               (session) =>
                   session.id == sessionId
-                      ? session.copyWith(startTime: newStartTime)
+                      ? session.copyWith(
+                        startTime: startTime,
+                        updatedAt: DateTime.now(),
+                      )
                       : session,
             )
             .toList();
@@ -725,12 +823,18 @@ class SessionProvider extends BaseProvider {
             ?.map(
               (session) =>
                   session.id == sessionId
-                      ? session.copyWith(startTime: newStartTime)
+                      ? session.copyWith(
+                        startTime: startTime,
+                        updatedAt: DateTime.now(),
+                      )
                       : session,
             )
             .toList();
     if (_selectedSession?.id == sessionId) {
-      _selectedSession = _selectedSession?.copyWith(startTime: newStartTime);
+      _selectedSession = _selectedSession?.copyWith(
+        startTime: startTime,
+        updatedAt: DateTime.now(),
+      );
     }
   }
 
@@ -739,11 +843,41 @@ class SessionProvider extends BaseProvider {
     int rating,
     String review,
   ) {
-    final sessionIndex =
-        _upcomingSessions?.indexWhere((s) => s.id == sessionId) ?? -1;
-    if (sessionIndex != -1) {
-      final session = _upcomingSessions![sessionIndex];
-      _upcomingSessions!.removeAt(sessionIndex);
+    _upcomingSessions =
+        _upcomingSessions
+            ?.map(
+              (session) =>
+                  session.id == sessionId
+                      ? session.copyWith(
+                        rating: rating.toDouble(),
+                        review: review,
+                        status: SessionStatus.completed,
+                        updatedAt: DateTime.now(),
+                      )
+                      : session,
+            )
+            .toList();
+    _pastSessions =
+        _pastSessions
+            ?.map(
+              (session) =>
+                  session.id == sessionId
+                      ? session.copyWith(
+                        rating: rating.toDouble(),
+                        review: review,
+                        status: SessionStatus.completed,
+                        updatedAt: DateTime.now(),
+                      )
+                      : session,
+            )
+            .toList();
+    if (_selectedSession?.id == sessionId) {
+      _selectedSession = _selectedSession?.copyWith(
+        rating: rating.toDouble(),
+        review: review,
+        status: SessionStatus.completed,
+        updatedAt: DateTime.now(),
+      );
     }
   }
 }
@@ -781,7 +915,6 @@ class HomeProvider extends BaseProvider {
       _lastFetched = DateTime.now();
     } on ApiError catch (e) {
       _error = e.message;
-      debugPrint('Error loading home data: ${e.message}');
       rethrow;
     } finally {
       _isLoading = false;
@@ -838,6 +971,7 @@ class TutorProvider extends BaseProvider {
         subject: subject,
         availability: availability,
         minRating: minRating,
+        limit: 10,
         offset: (page - 1) * 10,
       );
 
@@ -903,55 +1037,47 @@ class TutorProvider extends BaseProvider {
     }
   }
 
-  Future<void> requestTutor({
-    required String userId,
-    required String subject,
-    required String details,
-    String? priority,
-  }) async {
-    _isLoading = true;
-    clearError();
-    notifyListeners();
-
-    try {
-      await _repository.createTutorRequest(
-        userId: userId,
-        subject: subject,
-        details: details,
-        priority: priority,
-      );
-    } on ApiError catch (e) {
-      _error = e.message;
-      rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
   Future<void> bookTutorSession({
+    required BuildContext context,
     required String userId,
     required String tutorId,
     required String subject,
-    required DateTime dateTime,
-    required String duration,
+    required DateTime startTime,
+    required int durationMinutes,
     required String platform,
-    required String description,
+    String? description,
   }) async {
     _isLoading = true;
     clearError();
     notifyListeners();
 
     try {
-      await _repository.bookSession(
+      ValidationUtil.validateSessionTiming(startTime);
+      ValidationUtil.validateDuration(durationMinutes);
+      final response = await _repository.bookSession(
         userId: userId,
         tutorId: tutorId,
         subject: subject,
-        dateTime: dateTime,
-        duration: int.parse(duration),
+        startTime: startTime,
+        durationMinutes: durationMinutes,
         platform: platform,
         description: description,
       );
+      // Fetch the new session and add to _pendingSessions
+      final sessionResponse = await SessionRepository().getSessionDetails(
+        userId,
+        response.data!,
+      );
+      final sessionProvider = Provider.of<SessionProvider>(
+        context,
+        listen: false,
+      );
+      if (sessionResponse.data != null) {
+        sessionProvider._pendingSessions = [
+          ...?sessionProvider._pendingSessions,
+          sessionResponse.data!,
+        ];
+      }
     } on ApiError catch (e) {
       _error = e.message;
       rethrow;
@@ -982,6 +1108,42 @@ class TutorProvider extends BaseProvider {
         teachingMode: teachingMode,
         venue: venue,
       );
+      await loadTutorApplications(userId); // Refresh applications
+    } on ApiError catch (e) {
+      _error = e.message;
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> approveTutorApplication({
+    required String applicationId,
+    required String name,
+    String? bio,
+    String? education,
+    String? experience,
+    String? teachingStyle,
+    String? profilePicture,
+  }) async {
+    _isLoading = true;
+    clearError();
+    notifyListeners();
+
+    try {
+      final response = await _repository.approveTutorApplication(
+        applicationId: applicationId,
+        name: name,
+        bio: bio,
+        education: education,
+        experience: experience,
+        teachingStyle: teachingStyle,
+        profilePicture: profilePicture,
+      );
+      _tutors = [...?_tutors, response.data!];
+      _tutorApplications =
+          _tutorApplications?.where((app) => app.id != applicationId).toList();
     } on ApiError catch (e) {
       _error = e.message;
       rethrow;
@@ -995,6 +1157,8 @@ class TutorProvider extends BaseProvider {
 /// Chat Provider
 class ChatProvider extends BaseProvider {
   final ChatRepository _repository;
+  final Map<String, List<Chat>> _chatCache = {};
+  final Map<String, List<Message>> _messageCache = {};
   List<Chat> _chats = [];
   List<Message> _messages = [];
 
@@ -1003,17 +1167,23 @@ class ChatProvider extends BaseProvider {
   List<Chat> get chats => _chats;
   List<Message> get messages => _messages;
 
-  Future<void> loadChats(String userId) async {
-    _isLoading = true;
-    clearError();
-    notifyListeners();
+  Future<void> loadChats(String userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _chatCache.containsKey(userId)) {
+      _chats = _chatCache[userId]!;
+      notifyListeners();
+      return;
+    }
 
     try {
+      _isLoading = true;
+      clearError();
+      notifyListeners();
+
       _chats = await _repository.getChats(userId);
+      _chatCache[userId] = _chats;
       _lastFetched = DateTime.now();
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error loading chats: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -1021,17 +1191,23 @@ class ChatProvider extends BaseProvider {
     }
   }
 
-  Future<void> loadMessages(String chatId) async {
-    _isLoading = true;
-    clearError();
-    notifyListeners();
+  Future<void> loadMessages(String chatId, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _messageCache.containsKey(chatId)) {
+      _messages = _messageCache[chatId]!;
+      notifyListeners();
+      return;
+    }
 
     try {
+      _isLoading = true;
+      clearError();
+      notifyListeners();
+
       _messages = await _repository.getMessages(chatId);
+      _messageCache[chatId] = _messages;
       _lastFetched = DateTime.now();
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error loading messages: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -1040,15 +1216,19 @@ class ChatProvider extends BaseProvider {
   }
 
   Future<void> sendMessage(Message message) async {
-    _isLoading = true;
-    clearError();
-    notifyListeners();
-
     try {
+      _isLoading = true;
+      clearError();
+      notifyListeners();
+
       await _repository.sendMessage(message);
+      _messageCache[message.chatId] = [
+        message,
+        ..._messageCache[message.chatId] ?? [],
+      ];
+      _messages = _messageCache[message.chatId]!;
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error sending message: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -1062,19 +1242,23 @@ class ChatProvider extends BaseProvider {
     String otherUserId,
     String otherUserName,
   ) async {
-    _isLoading = true;
-    clearError();
-    notifyListeners();
-
     try {
+      _isLoading = true;
+      clearError();
+      notifyListeners();
+
+      final batch = FirebaseFirestore.instance.batch();
       final chatId = FirebaseFirestore.instance.collection('chats').doc().id;
+
       final users = await Future.wait([
         FirebaseFirestore.instance.collection('users').doc(currentUserId).get(),
         FirebaseFirestore.instance.collection('users').doc(otherUserId).get(),
       ]);
 
-      final currentUserProfilePicture = users[0].data()?['profile_picture'];
-      final otherUserProfilePicture = users[1].data()?['profile_picture'];
+      final currentUserProfilePicture =
+          users[0].data()?['profile_picture'] as String?;
+      final otherUserProfilePicture =
+          users[1].data()?['profile_picture'] as String?;
 
       final chatData = {
         'members': [currentUserId, otherUserId],
@@ -1101,35 +1285,56 @@ class ChatProvider extends BaseProvider {
         unreadCount: 0,
       );
 
-      await Future.wait([
-        FirebaseFirestore.instance
-            .collection('chats')
-            .doc(chatId)
-            .set(chatData),
+      batch.set(
+        FirebaseFirestore.instance.collection('chats').doc(chatId),
+        chatData,
+      );
+      batch.set(
         FirebaseFirestore.instance
             .collection('users')
             .doc(currentUserId)
             .collection('chats')
-            .doc(chatId)
-            .set(currentUserChat.toJson()),
+            .doc(chatId),
+        currentUserChat.toJson(),
+      );
+      batch.set(
         FirebaseFirestore.instance
             .collection('users')
             .doc(otherUserId)
             .collection('chats')
-            .doc(chatId)
-            .set(otherUserChat.toJson()),
-      ]);
+            .doc(chatId),
+        otherUserChat.toJson(),
+      );
 
-      _chats.add(currentUserChat);
+      await batch.commit();
+
+      _chatCache[currentUserId] = [
+        currentUserChat,
+        ..._chatCache[currentUserId] ?? [],
+      ];
+      _chats = _chatCache[currentUserId]!;
       return chatId;
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error creating chat: $e');
       rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void clearCache() {
+    _chatCache.clear();
+    _messageCache.clear();
+    _chats = [];
+    _messages = [];
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    clearCache();
+    super.dispose();
   }
 }
 
@@ -1326,6 +1531,250 @@ class PracticeTestsProvider extends BaseProvider {
   }
 }
 
+/// Saved Items Provider
+class SavedItemsProvider extends BaseProvider {
+  final SavedItemsRepository _repository;
+  List<SavedItem>? _savedSessions;
+  List<SavedItem>? _savedMaterials;
+  List<SavedItem>? _savedTests;
+
+  SavedItemsProvider(this._repository);
+
+  List<SavedItem>? get savedSessions => _savedSessions;
+  List<SavedItem>? get savedMaterials => _savedMaterials;
+  List<SavedItem>? get savedTests => _savedTests;
+
+  Future<void> loadSavedItems(
+    String userId, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh &&
+        _savedSessions != null &&
+        _savedMaterials != null &&
+        _savedTests != null &&
+        isCacheValid(const Duration(minutes: 30))) {
+      return;
+    }
+
+    _isLoading = true;
+    clearError();
+    notifyListeners();
+
+    try {
+      final responses = await Future.wait([
+        _repository.getSavedItems(userId, 'Session'),
+        _repository.getSavedItems(userId, 'Material'),
+        _repository.getSavedItems(userId, 'Test'),
+      ]);
+
+      _savedSessions = responses[0].data?.cast<SavedItem>();
+      _savedMaterials = responses[1].data?.cast<SavedItem>();
+      _savedTests = responses[2].data?.cast<SavedItem>();
+      _lastFetched = DateTime.now();
+    } on ApiError catch (e) {
+      _error = e.message;
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeSavedItem(String userId, String itemId) async {
+    _isLoading = true;
+    clearError();
+    notifyListeners();
+
+    try {
+      await _repository.removeSavedItem(userId, itemId);
+      // Refresh the saved items after removal
+      await loadSavedItems(userId, forceRefresh: true);
+    } on ApiError catch (e) {
+      _error = e.message;
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+}
+
+/// Lecturer Dashboard Provider
+class LecturerDashboardProvider with ChangeNotifier {
+  final TutorRepository _tutorRepository = TutorRepository();
+  final StudyMaterialsRepository _studyMaterialsRepository =
+      StudyMaterialsRepository();
+  final AnalyticsRepository _analyticsRepository = AnalyticsRepository();
+  final SessionRepository sessionRepository = SessionRepository();
+
+  List<Tutor> _tutors = [];
+  List<TutorApplication> _tutorApplications = [];
+  List<StudyMaterial> _studyMaterials = [];
+  List<WeeklyActivity> _weeklyActivities = [];
+  List<SubjectDistribution> _subjectDistributions = [];
+  List<Session> _sessions = [];
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  List<Tutor> get tutors => _tutors;
+  List<TutorApplication> get tutorApplications => _tutorApplications;
+  List<StudyMaterial> get studyMaterials => _studyMaterials;
+  List<WeeklyActivity> get weeklyActivities => _weeklyActivities;
+  List<SubjectDistribution> get subjectDistributions => _subjectDistributions;
+  List<Session> get sessions => _sessions;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+
+  Future<void> fetchTutors() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _tutorRepository.getTutors(limit: 50);
+      _tutors = response.data ?? [];
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchTutorApplications() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _tutorRepository.getTutorApplications(
+        FirebaseConfig.firebaseAuth.currentUser?.uid ?? '',
+      );
+      _tutorApplications = response.data ?? [];
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> approveTutorApplication(
+    String applicationId,
+    String name,
+  ) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _tutorRepository.approveTutorApplication(
+        applicationId: applicationId,
+        name: name,
+      );
+      _tutorApplications.removeWhere((app) => app.id == applicationId);
+      await fetchTutors();
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchStudyMaterials(String userId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _studyMaterialsRepository.getStudyMaterials(
+        userId,
+      );
+      _studyMaterials = response.data ?? [];
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> addStudyMaterial({
+    required String userId,
+    required String subject,
+    required int resourceCount,
+    required double progress,
+    required Color color,
+    required IconData icon,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final material = StudyMaterial(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        subject: subject,
+        resourceCount: resourceCount,
+        progress: progress,
+        color: color,
+        icon: icon,
+      );
+      await FirebaseConfig.firestore
+          .collection('users')
+          .doc(userId)
+          .collection('study_materials')
+          .doc(material.id)
+          .set(material.toJson());
+      await fetchStudyMaterials(userId);
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchAnalytics(String userId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final weeklyResponse = await _analyticsRepository.getWeeklyActivity(
+        userId,
+      );
+      final subjectResponse = await _analyticsRepository.getSubjectDistribution(
+        userId,
+      );
+      _weeklyActivities = weeklyResponse.data ?? [];
+      _subjectDistributions = subjectResponse.data ?? [];
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchSessions() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await sessionRepository.getAvailableSessions();
+      _sessions = response.data ?? [];
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+}
+
 /// MultiProvider Setup
 List<SingleChildWidget> getProviders() {
   return [
@@ -1373,6 +1822,11 @@ List<SingleChildWidget> getProviders() {
     Provider(create: (_) => StudyMaterialsRepository()),
     ChangeNotifierProxyProvider<AppProvider, StudyMaterialsProvider>(
       create: (_) => StudyMaterialsProvider(StudyMaterialsRepository()),
+      update: (_, __, provider) => provider!,
+    ),
+    Provider(create: (_) => SavedItemsRepository()),
+    ChangeNotifierProxyProvider<AppProvider, SavedItemsProvider>(
+      create: (_) => SavedItemsProvider(SavedItemsRepository()),
       update: (_, __, provider) => provider!,
     ),
     Provider(create: (_) => PracticeTestsRepository()),

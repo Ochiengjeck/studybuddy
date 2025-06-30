@@ -33,16 +33,12 @@ class SubmitApplicationScreen extends StatefulWidget {
 
 class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
     with SingleTickerProviderStateMixin {
-  late bool _agreementChecked;
-  late bool _accuracyChecked;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _agreementChecked = false;
-    _accuracyChecked = false;
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -60,7 +56,7 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
   }
 
   Future<void> _submitApplication(BuildContext context) async {
-    if (!_agreementChecked || !_accuracyChecked) {
+    if (!widget.agreementChecked || !widget.accuracyChecked) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please agree to all terms and confirm accuracy'),
@@ -522,7 +518,6 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
                       Icons.person_outline_rounded,
                       Colors.blue.shade600,
                     ),
-                    // Update the personal info display to match what's collected:
                     _buildFormField(
                       label: 'Full Name',
                       value: widget.personalInfo['fullName'] ?? '',
@@ -715,7 +710,6 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
                       },
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
-
                     CheckboxListTile(
                       title: const Text(
                         'I confirm all information is accurate',
@@ -727,6 +721,49 @@ class _SubmitApplicationScreenState extends State<SubmitApplicationScreen>
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                   ],
+                ),
+              ),
+
+              // Submit Button
+              Container(
+                margin: const EdgeInsets.only(top: 32),
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed:
+                      tutorProvider.isLoading
+                          ? null
+                          : () => _submitApplication(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 32,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 4,
+                  ),
+                  child:
+                      tutorProvider.isLoading
+                          ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                          : const Text(
+                            'Submit Application',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                 ),
               ),
 

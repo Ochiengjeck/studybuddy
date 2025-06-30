@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../utils/providers/providers.dart';
 import 'apply_tutor/apply_tutor_flow.dart';
-import 'request_tutor_screen.dart';
 import 'tutor_details_screen.dart';
 import '../../../widgets/tutor_card.dart';
 
@@ -440,10 +439,10 @@ class _TutorsScreenState extends State<TutorsScreen>
                                   name: tutor.name,
                                   subjects: tutor.subjects,
                                   rating: tutor.rating,
-                                  sessions: 0, // Not stored in Tutor model
-                                  points: 0, // Not stored in Tutor model
-                                  badges: 0, // Not stored in Tutor model
-                                  isAvailable: tutor.availability.isNotEmpty,
+                                  sessions: tutor.sessionsCompleted,
+                                  points: tutor.points,
+                                  badges: tutor.badges,
+                                  isAvailable: tutor.isAvailable,
                                   imageUrl:
                                       tutor.profilePicture ??
                                       'https://picsum.photos/200/200?random=$index',
@@ -501,21 +500,6 @@ class _TutorsScreenState extends State<TutorsScreen>
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          FloatingActionButton(
-            tooltip: "Request a Tutor",
-            heroTag: 'request_tutor',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RequestTutorScreen(),
-                ),
-              );
-            },
-            backgroundColor: Colors.blue.shade600,
-            child: const Icon(Icons.request_quote, color: Colors.white),
-          ),
-          const SizedBox(height: 16),
           FloatingActionButton(
             tooltip: "Apply to be a Tutor",
             heroTag: 'apply_tutor',

@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:studybuddy/lecturer/lecturer_dashboard.dart';
 import 'package:studybuddy/utils/modelsAndRepsositories/models_and_repositories.dart';
 import 'package:studybuddy/utils/providers/providers.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../pages/index.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
@@ -22,12 +24,81 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
   bool _obscurePassword = true;
+  bool _isCheckingAuth = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthenticationStatus();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAuthenticationStatus() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+
+      final currentUser = auth.FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null && currentUser.emailVerified) {
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
+
+        if (userDoc.exists) {
+          final userData = User.fromJson({
+            ...userDoc.data()!,
+            'id': currentUser.uid,
+            'email': currentUser.email,
+            'is_verified': currentUser.emailVerified,
+          });
+
+          // Store FCM token
+          final fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .update({'fcm_token': fcmToken});
+          }
+
+          appProvider.setCurrentUser(userData);
+
+          if (!mounted) return;
+
+          if (userData.userType == "admin") {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LecturerDashboardScreen(),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => IndexPage()),
+            );
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking authentication status: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingAuth = false;
+        });
+      }
+    }
   }
 
   Future<void> _handleLogin(BuildContext context) async {
@@ -45,11 +116,32 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.success && response.data != null) {
+        // Store FCM token
+        final fcmToken = await FirebaseMessaging.instance.getToken();
+        if (fcmToken != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(response.data!.id)
+              .update({'fcm_token': fcmToken});
+        }
+
         appProvider.setCurrentUser(response.data!);
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => IndexPage()),
+        debugPrint("The user is an ${appProvider.currentUser?.userType}");
+        debugPrint(
+          "User is admin: ${appProvider.currentUser?.userType == "admin"}",
         );
+
+        if (appProvider.currentUser?.userType == "admin") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => LecturerDashboardScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => IndexPage()),
+          );
+        }
       }
     } on ApiError catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -65,78 +157,92 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Future<void> _handleGoogleSignIn(BuildContext context) async {
-  //   final authProvider = Provider.of<AuthProvider>(context, listen: false);
-  //   final appProvider = Provider.of<AppProvider>(context, listen: false);
+  Future<void> _handleGoogleSignIn(BuildContext context) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
 
-  //   try {
-  //     final googleSignIn = GoogleSignIn();
-  //     final googleUser = await googleSignIn.signIn();
+    try {
+      final googleSignIn = GoogleSignIn();
+      final googleUser = await googleSignIn.signIn();
 
-  //     if (googleUser == null) {
-  //       // User cancelled sign-in
-  //       return;
-  //     }
+      if (googleUser == null) {
+        return; // User cancelled sign-in
+      }
 
-  //     final googleAuth = await googleUser.authentication;
+      final googleAuth = await googleUser.authentication;
 
-  //     final credential = auth.GoogleAuthProvider.credential(
-  //       accessToken: googleAuth.accessToken,
-  //       idToken: googleAuth.idToken,
-  //     );
+      final credential = auth.GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
 
-  //     final authResult = await FirebaseConfig.firebaseAuth.signInWithCredential(
-  //       credential,
-  //     );
+      final authResult = await auth.FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final user = authResult.user;
+      if (user == null) {
+        throw Exception('Failed to retrieve user from Google Sign-In.');
+      }
 
-  //     final user = authResult.user;
-  //     if (user == null) {
-  //       throw Exception('Failed to retrieve user from Google Sign-In.');
-  //     }
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
 
-  //     final userDoc =
-  //         await FirebaseConfig.firestore
-  //             .collection('users')
-  //             .doc(user.uid)
-  //             .get();
+      final userData =
+          userDoc.exists
+              ? User.fromJson({
+                ...userDoc.data()!,
+                'id': user.uid,
+                'email': user.email,
+                'is_verified': user.emailVerified,
+              })
+              : await _createUserFromGoogle(user);
 
-  //     final userData =
-  //         userDoc.exists
-  //             ? User.fromJson({
-  //               ...userDoc.data()!,
-  //               'id': user.uid,
-  //               'email': user.email,
-  //               'is_verified': user.emailVerified,
-  //             })
-  //             : await _createUserFromGoogle(user);
+      // Store FCM token
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({'fcm_token': fcmToken});
+      }
 
-  //     appProvider.setCurrentUser(userData);
+      appProvider.setCurrentUser(userData);
 
-  //     if (!context.mounted) return;
-  //     Navigator.pushReplacement(
-  //       context,
-  //       MaterialPageRoute(builder: (context) => PagesIndex()),
-  //     );
-  //   } catch (e) {
-  //     if (!context.mounted) return;
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: Text('Google Sign-In failed: ${e.toString()}'),
-  //         behavior: SnackBarBehavior.floating,
-  //         backgroundColor: Theme.of(context).colorScheme.error,
-  //         shape: RoundedRectangleBorder(
-  //           borderRadius: BorderRadius.circular(12),
-  //         ),
-  //       ),
-  //     );
-  //   }
-  // }
+      if (!context.mounted) return;
+      if (userData.userType == "admin") {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => LecturerDashboardScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => IndexPage()),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Google Sign-In failed: ${e.toString()}'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+  }
 
   Future<User> _createUserFromGoogle(auth.User firebaseUser) async {
     final userData = {
       'email': firebaseUser.email,
-      'first_name': firebaseUser.displayName?.split(' ').first,
-      'last_name': firebaseUser.displayName?.split(' ').skip(1).join(' '),
+      'first_name': firebaseUser.displayName?.split(' ').first ?? '',
+      'last_name': firebaseUser.displayName?.split(' ').skip(1).join(' ') ?? '',
       'phone': firebaseUser.phoneNumber,
       'is_active': true,
       'is_verified': firebaseUser.emailVerified,
@@ -144,7 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
       'user_type': 'student',
     };
 
-    await FirebaseConfig.firestore
+    await FirebaseFirestore.instance
         .collection('users')
         .doc(firebaseUser.uid)
         .set(userData);
@@ -440,8 +546,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3)),
         ),
-        onPressed: () {},
-        // onPressed: () => _handleGoogleSignIn(context),
+        onPressed: () => _handleGoogleSignIn(context),
       ),
     );
   }

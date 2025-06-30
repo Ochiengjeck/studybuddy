@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:studybuddy/screens/pages/Analytics/analytics_page.dart';
 import 'package:studybuddy/screens/pages/achievements/achievements_page.dart';
 import 'package:studybuddy/screens/pages/achievements/leaderboard/leaderboard_screen.dart';
@@ -11,6 +12,7 @@ import 'package:studybuddy/screens/pages/sessions/sessions_screen.dart';
 import 'package:studybuddy/screens/pages/settings/settings_page.dart';
 import 'package:studybuddy/screens/pages/test/practice_tests_page.dart';
 import 'package:studybuddy/screens/pages/tutors/tutors_screen.dart';
+import 'package:studybuddy/utils/providers/providers.dart';
 // import 'package:studybuddy/widgets/bottom_navigation_bar.dart';
 import 'package:studybuddy/widgets/drawer.dart';
 
@@ -45,6 +47,7 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -328,6 +331,7 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
                 onPressed: () {
                   Navigator.pop(context);
                   // Perform logout logic here
+                  Provider.of<AppProvider>(context, listen: false).logout();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,

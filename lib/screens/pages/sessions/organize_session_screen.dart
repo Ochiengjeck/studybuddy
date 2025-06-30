@@ -1,9 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
-import '../../../utils/providers/providers.dart';
 
 class OrganizeSessionScreen extends StatefulWidget {
   const OrganizeSessionScreen({super.key});
@@ -190,6 +187,7 @@ class _OrganizeSessionScreenState extends State<OrganizeSessionScreen>
         'level': _selectedLevel,
         'description': _descriptionController.text,
         'scheduledDateTime': Timestamp.fromDate(_scheduledDateTime!),
+        'start_time': Timestamp.fromDate(_scheduledDateTime!),
         'duration': _duration.inMinutes,
         'platform': _selectedPlatform,
         'maxParticipants': int.parse(_maxParticipantsController.text),
@@ -197,12 +195,12 @@ class _OrganizeSessionScreenState extends State<OrganizeSessionScreen>
         'recurringPattern': _isRecurring ? _recurringPattern : null,
         'isPaid': _isPaid,
         'price': _isPaid ? double.parse(_priceController.text) : 0.0,
-        'status': 'open',
+        'status': 'upcoming',
         'createdAt': Timestamp.now(),
         'type': 'organized',
       });
 
-      _showSuccessSnackBar(context, 'Session organized successfully!');
+      _showSuccessSnackBar(context, 'Session set successfully!');
       Navigator.pop(context);
     } catch (e) {
       _showErrorSnackBar(context, 'Error: ${e.toString()}');
@@ -219,7 +217,7 @@ class _OrganizeSessionScreenState extends State<OrganizeSessionScreen>
     return Scaffold(
       backgroundColor: isDark ? Colors.grey[900] : Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Organize Session'),
+        title: const Text('Set Session'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -562,7 +560,7 @@ class _OrganizeSessionScreenState extends State<OrganizeSessionScreen>
                                 ),
                                 const SizedBox(height: 24),
                                 _buildActionButton(
-                                  text: 'Organize Session',
+                                  text: 'Set Session',
                                   icon: Icons.event,
                                   onPressed: _submitSession,
                                   isLoading: _isLoading,

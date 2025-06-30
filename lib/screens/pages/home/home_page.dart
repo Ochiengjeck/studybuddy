@@ -5,6 +5,7 @@ import 'package:studybuddy/widgets/session_card.dart';
 import 'package:studybuddy/widgets/stats_card.dart';
 
 import '../../../utils/providers/providers.dart';
+import '../../../widgets/custom_loading.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,7 +34,9 @@ class _HomePageState extends State<HomePage> {
       body: Consumer<AppProvider>(
         builder: (context, appProvider, child) {
           if (appProvider.isInitializing) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: StudyBuddyLoadingWidgets.pencilWritingLoader(),
+            );
           }
           if (appProvider.error != null) {
             return Center(child: Text('Error: ${appProvider.error}'));
@@ -44,7 +47,9 @@ class _HomePageState extends State<HomePage> {
           return Consumer<HomeProvider>(
             builder: (context, homeProvider, child) {
               if (homeProvider.isLoading) {
-                return const Center(child: CircularProgressIndicator());
+                return Center(
+                  child: StudyBuddyLoadingWidgets.pencilWritingLoader(),
+                );
               }
               if (homeProvider.error != null) {
                 return Center(child: Text('Error: ${homeProvider.error}'));
