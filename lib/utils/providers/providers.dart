@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
@@ -447,7 +448,16 @@ class SessionProvider extends BaseProvider {
 
     _isLoading = true;
     clearError();
-    notifyListeners();
+
+    // Don't call notifyListeners() immediately if called during build
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    } else {
+      notifyListeners();
+    }
 
     try {
       final response = await _repository.getUpcomingSessions(userId);
@@ -460,7 +470,16 @@ class SessionProvider extends BaseProvider {
       rethrow;
     } finally {
       _isLoading = false;
-      notifyListeners();
+
+      // Safe notifyListeners call
+      if (WidgetsBinding.instance.schedulerPhase ==
+          SchedulerPhase.persistentCallbacks) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+      } else {
+        notifyListeners();
+      }
     }
   }
 
