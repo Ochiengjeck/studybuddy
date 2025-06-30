@@ -373,125 +373,64 @@ class _TutorsScreenState extends State<TutorsScreen>
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverToBoxAdapter(
-                child:
-                    tutorProvider.isLoading && tutorProvider.tutors == null
-                        ? const Center(child: CircularProgressIndicator())
-                        : tutorProvider.error != null
-                        ? Center(child: Text('Error: ${tutorProvider.error}'))
-                        : tutorProvider.tutors == null ||
-                            tutorProvider.tutors!.isEmpty
-                        ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Center(child: Image.asset('assets/no_results.png')),
-                            Text(
-                              tutorProvider.tutors!.isEmpty
-                                  ? 'No tutors found'
-                                  : 'No tutors match your filters',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        )
-                        : GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                childAspectRatio: isTablet ? 0.55 : 0.9,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                              ),
-                          itemCount:
-                              tutorProvider.tutors!.length +
-                              (tutorProvider.hasMore ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == tutorProvider.tutors!.length) {
-                              tutorProvider.loadMoreTutors();
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            }
-                            final tutor = tutorProvider.tutors![index];
-                            return AnimatedContainer(
-                              duration: Duration(
-                                milliseconds: 300 + (index * 50),
-                              ),
-                              curve: Curves.easeOutBack,
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => TutorDetailsScreen(
-                                            tutorId: tutor.id,
-                                          ),
-                                    ),
-                                  );
-                                },
-                                child: TutorCard(
-                                  name: tutor.name,
-                                  subjects: tutor.subjects,
-                                  rating: tutor.rating,
-                                  sessions: tutor.sessionsCompleted,
-                                  points: tutor.points,
-                                  badges: tutor.badges,
-                                  isAvailable: tutor.isAvailable,
-                                  imageUrl:
-                                      tutor.profilePicture ??
-                                      'https://picsum.photos/200/200?random=$index',
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-              ),
-            ),
-
-            // Load More Button
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.all(20),
-                child: ElevatedButton(
-                  onPressed:
-                      tutorProvider.isLoading || !tutorProvider.hasMore
-                          ? null
-                          : () {
-                            tutorProvider.loadMoreTutors();
-                          },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.blue.shade600,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 32,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.blue.shade200),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.refresh, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Load More Tutors',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
+                child: _buildTutorsList(
+                  tutorProvider,
+                  crossAxisCount,
+                  isTablet,
                 ),
               ),
             ),
+
+            // Load More Button - Only show if there are tutors and more to load
+            if (tutorProvider.tutors != null &&
+                tutorProvider.tutors!.isNotEmpty &&
+                tutorProvider.hasMore)
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.all(20),
+                  child: ElevatedButton(
+                    onPressed:
+                        tutorProvider.isLoading
+                            ? null
+                            : () {
+                              tutorProvider.loadMoreTutors();
+                            },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.blue.shade600,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 32,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.blue.shade200),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (tutorProvider.isLoading)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          const Icon(Icons.refresh, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          tutorProvider.isLoading
+                              ? 'Loading...'
+                              : 'Load More Tutors',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -514,6 +453,133 @@ class _TutorsScreenState extends State<TutorsScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTutorsList(
+    TutorProvider tutorProvider,
+    int crossAxisCount,
+    bool isTablet,
+  ) {
+    // Loading state
+    if (tutorProvider.isLoading && tutorProvider.tutors == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(50),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // Error state
+    if (tutorProvider.error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(50),
+          child: Column(
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'Error: ${tutorProvider.error}',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => tutorProvider.loadTutors(),
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Empty state
+    if (tutorProvider.tutors == null || tutorProvider.tutors!.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(50),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/no_results.png',
+                height: 200,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.person_search,
+                    size: 100,
+                    color: Colors.grey[300],
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                tutorProvider.tutors != null && tutorProvider.tutors!.isEmpty
+                    ? 'No tutors match your filters'
+                    : 'No tutors found',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Try adjusting your search criteria or check back later',
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Tutors grid
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: isTablet ? 0.55 : 0.9,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: tutorProvider.tutors!.length,
+      itemBuilder: (context, index) {
+        final tutor = tutorProvider.tutors![index];
+        return AnimatedContainer(
+          duration: Duration(milliseconds: 300 + (index * 50)),
+          curve: Curves.easeOutBack,
+          child: GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TutorDetailsScreen(tutorId: tutor.id),
+                ),
+              );
+            },
+            child: TutorCard(
+              name: tutor.name,
+              subjects: tutor.subjects,
+              rating: tutor.rating,
+              sessions: tutor.sessionsCompleted,
+              points: tutor.points,
+              badges: tutor.badges,
+              isAvailable: tutor.isAvailable,
+              imageUrl:
+                  tutor.profilePicture ??
+                  'https://picsum.photos/200/200?random=$index',
+            ),
+          ),
+        );
+      },
     );
   }
 
