@@ -34,9 +34,7 @@ class _HomePageState extends State<HomePage> {
       body: Consumer<AppProvider>(
         builder: (context, appProvider, child) {
           if (appProvider.isInitializing) {
-            return Center(
-              child: StudyBuddyLoadingWidgets.pencilWritingLoader(),
-            );
+            return Center(child: StudyBuddyLoadingWidgets.animatedBookLoader());
           }
           if (appProvider.error != null) {
             return Center(child: Text('Error: ${appProvider.error}'));
@@ -48,7 +46,7 @@ class _HomePageState extends State<HomePage> {
             builder: (context, homeProvider, child) {
               if (homeProvider.isLoading) {
                 return Center(
-                  child: StudyBuddyLoadingWidgets.pencilWritingLoader(),
+                  child: StudyBuddyLoadingWidgets.brainThinkingLoader(),
                 );
               }
               if (homeProvider.error != null) {
