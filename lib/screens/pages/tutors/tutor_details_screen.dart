@@ -256,7 +256,14 @@ class _TutorDetailsScreenState extends State<TutorDetailsScreen> {
           const SizedBox(height: 30),
 
           // Booking Button
-          _buildBookingButton(theme),
+          if (Provider.of<AppProvider>(
+                context,
+                listen: false,
+              ).currentUser!.userType ==
+              'admin')
+            SizedBox()
+          else
+            _buildBookingButton(theme),
           const SizedBox(height: 20),
         ],
       ),

@@ -141,14 +141,22 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
       }
 
       // Set up custom message listener
-      // _trtcCloud.setListener(onCustomMessageReceived: (String userId, String message) {
-      //   _addMessage(ChatMessage(
-      //     sender: userId,
-      //     content: message,
-      //     isMe: false,
-      //     timestamp: DateTime.now(),
-      //   ));
-      // });
+      _trtcCloud.registerListener((type, params) {
+        if (type == TRTCCloudListener.onRecvCustomCmdMsg) {
+          final String userId = params['userId'];
+          final String message = params['message'];
+          _addMessage(
+            ChatMessage(
+              sender: userId,
+              content: message,
+              isMe: false,
+              timestamp: DateTime.now(),
+            ),
+          );
+        }
+        // Call the main listener as well
+        onListener(type, params);
+      });
 
       setState(() => _isInitialized = true);
     } catch (e) {

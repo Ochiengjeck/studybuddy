@@ -6,8 +6,38 @@ import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
 import '../../../utils/providers/providers.dart';
 import 'chat_screen.dart';
 
-class ChatListScreen extends StatelessWidget {
+class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
+
+  @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Defer initialization to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeChats();
+    });
+  }
+
+  void _initializeChats() {
+    if (!mounted || _isInitialized) return;
+
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    if (appProvider.currentUser?.id != null) {
+      chatProvider.loadChats(appProvider.currentUser!.id);
+      setState(() {
+        _isInitialized = true;
+      });
+    }
+  }
 
   // Validate if a string is a valid URL
   Future<bool> _isValidUrl(String? url) async {
@@ -32,15 +62,15 @@ class ChatListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chatProvider = Provider.of<ChatProvider>(context);
     final appProvider = Provider.of<AppProvider>(context);
 
-    // Load chats if user is logged in
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (appProvider.currentUser?.id != null) {
-        chatProvider.loadChats(appProvider.currentUser!.id);
-      }
-    });
+    // Show loading if user is not available or chats not initialized
+    if (appProvider.currentUser?.id == null || !_isInitialized) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Chats')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Chats')),
@@ -50,14 +80,59 @@ class ChatListScreen extends StatelessWidget {
                 .collection('users')
                 .doc(appProvider.currentUser?.id)
                 .collection('chats')
+                .orderBy('last_message_time', descending: true)
                 .snapshots(),
         builder: (context, AsyncSnapshot snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text('Error: ${snapshot.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _isInitialized = false;
+                      });
+                      _initializeChats();
+                    },
+                    child: const Text('Try Again'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No chats available'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 100,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'No chats available',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Start a conversation by tapping the + button',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
           }
 
           final chats =
@@ -89,48 +164,64 @@ class ChatListScreen extends StatelessWidget {
         final imageUrl =
             snapshot.data ??
             'https://ui-avatars.com/api/?name=${Uri.encodeComponent(chat.name)}&background=random';
-        return ListTile(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) => ChatScreen(
-                      chatId: chat.id,
-                      name: chat.name,
-                      imageUrl: imageUrl,
-                    ),
-              ),
-            );
-          },
-          leading: CircleAvatar(backgroundImage: NetworkImage(imageUrl)),
-          title: Text(chat.name),
-          subtitle: Text(
-            chat.lastMessage,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                _formatTime(chat.lastMessageTime),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              if (chat.unreadCount > 0)
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    chat.unreadCount.toString(),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: ListTile(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => ChatScreen(
+                        chatId: chat.id,
+                        name: chat.name,
+                        imageUrl: imageUrl,
+                      ),
                 ),
-            ],
+              );
+            },
+            leading: CircleAvatar(
+              backgroundImage: NetworkImage(imageUrl),
+              onBackgroundImageError: (_, __) {},
+            ),
+            title: Text(
+              chat.name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              chat.lastMessage.isEmpty ? 'No messages yet' : chat.lastMessage,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: chat.lastMessage.isEmpty ? Colors.grey : null,
+              ),
+            ),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _formatTime(chat.lastMessageTime),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (chat.unreadCount > 0)
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      chat.unreadCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -207,7 +298,9 @@ class ChatListScreen extends StatelessWidget {
                         }
 
                         if (snapshot.hasError) {
-                          return Center(child: Text('Error loading users'));
+                          return const Center(
+                            child: Text('Error loading users'),
+                          );
                         }
 
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -244,6 +337,7 @@ class ChatListScreen extends StatelessWidget {
                                   leading: CircleAvatar(
                                     radius: 24,
                                     backgroundImage: NetworkImage(imageUrl),
+                                    onBackgroundImageError: (_, __) {},
                                   ),
                                   title: Text(
                                     user.fullName,

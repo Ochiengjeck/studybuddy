@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:studybuddy/screens/auth/log_in.dart';
+import '../screens/pages/tutors/tutor_details_screen.dart';
 import '../utils/modelsAndRepsositories/models_and_repositories.dart';
 import '../utils/providers/providers.dart';
+import 'package:intl/intl.dart';
 
 // Modern Lecturer Dashboard Screen
 class LecturerDashboardScreen extends StatelessWidget {
@@ -22,7 +24,8 @@ class LecturerDashboardScreen extends StatelessWidget {
                 ..fetchAnalytics(
                   FirebaseConfig.firebaseAuth.currentUser?.uid ?? '',
                 )
-                ..fetchSessions(),
+                ..fetchSessions()
+                ..startRealTimeSessionMonitoring(),
       child: Theme(
         data: Theme.of(context).copyWith(
           colorScheme: ColorScheme.fromSeed(
@@ -45,7 +48,7 @@ class LecturerDashboardScreen extends StatelessWidget {
                   ),
                 );
               }
-              if (provider.errorMessage != null) {
+              if (provider.error != null) {
                 return Center(
                   child: Container(
                     margin: const EdgeInsets.all(24),
@@ -65,7 +68,7 @@ class LecturerDashboardScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Error: ${provider.errorMessage}',
+                          'Error: ${provider.error}',
                           style: TextStyle(
                             color: Colors.red.shade800,
                             fontSize: 16,
@@ -124,7 +127,7 @@ class LecturerDashboardScreen extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text(
-                                  'Dashboard',
+                                  'Instructor Dashboard',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 32,
@@ -154,7 +157,7 @@ class LecturerDashboardScreen extends StatelessWidget {
                             ),
                             const Spacer(),
                             Text(
-                              'Welcome back, Lecturer',
+                              'Welcome back, Instructor',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 16,
@@ -190,7 +193,7 @@ class LecturerDashboardScreen extends StatelessWidget {
                         Tab(text: 'Tutors'),
                         Tab(text: 'Applications'),
                         Tab(text: 'Materials'),
-                        Tab(text: 'Analytics'),
+                        Tab(text: 'Sessions'),
                       ],
                     ),
                   ),
@@ -202,7 +205,7 @@ class LecturerDashboardScreen extends StatelessWidget {
             _buildModernTutorsTab(context, provider),
             _buildModernApplicationsTab(context, provider),
             _buildModernMaterialsTab(context, provider),
-            _buildModernAnalyticsTab(context, provider),
+            _buildModernSessionsTab(context, provider),
           ],
         ),
       ),
@@ -241,7 +244,7 @@ class LecturerDashboardScreen extends StatelessWidget {
                   PageRouteBuilder(
                     pageBuilder:
                         (context, animation, secondaryAnimation) =>
-                            TutorDetailsScreen(tutor: tutor),
+                            TutorDetailsScreen(tutorId: tutor.id),
                     transitionsBuilder: (
                       context,
                       animation,
@@ -390,32 +393,56 @@ class LecturerDashboardScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color:
-                            tutor.isAvailable
-                                ? Colors.red.shade50
-                                : Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          tutor.isAvailable
-                              ? Icons.pause_circle
-                              : Icons.play_circle,
-                          color:
+                    Column(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color:
+                                tutor.isAvailable
+                                    ? Colors.red.shade50
+                                    : Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            icon: Icon(
                               tutor.isAvailable
-                                  ? Colors.red.shade600
-                                  : Colors.green.shade600,
+                                  ? Icons.pause_circle
+                                  : Icons.play_circle,
+                              color:
+                                  tutor.isAvailable
+                                      ? Colors.red.shade600
+                                      : Colors.green.shade600,
+                            ),
+                            onPressed: () async {
+                              await FirebaseConfig.firestore
+                                  .collection('tutors')
+                                  .doc(tutor.id)
+                                  .update({'is_available': !tutor.isAvailable});
+                              provider.fetchTutors();
+                            },
+                          ),
                         ),
-                        onPressed: () async {
-                          await FirebaseConfig.firestore
-                              .collection('tutors')
-                              .doc(tutor.id)
-                              .update({'is_available': !tutor.isAvailable});
-                          provider.fetchTutors();
-                        },
-                      ),
+                        const SizedBox(height: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.person_add,
+                              color: Colors.blue.shade600,
+                            ),
+                            onPressed: () {
+                              _showAssignPeerTutorDialog(
+                                context,
+                                provider,
+                                tutor,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -424,6 +451,18 @@ class LecturerDashboardScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  void _showAssignPeerTutorDialog(
+    BuildContext context,
+    LecturerDashboardProvider provider,
+    Tutor tutor,
+  ) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AssignPeerTutorDialog(provider: provider, tutor: tutor),
     );
   }
 
@@ -445,7 +484,6 @@ class LecturerDashboardScreen extends StatelessWidget {
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  // Perform logout logic here
                   Provider.of<AppProvider>(context, listen: false).logout();
                   Navigator.pushReplacement(
                     context,
@@ -561,32 +599,61 @@ class LecturerDashboardScreen extends StatelessWidget {
                 ),
                 if (application.status == 'pending') ...[
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366F1),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade600,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            await provider.approveTutorApplication(
+                              applicationId: application.id,
+                            );
+                          },
+                          child: const Text(
+                            'Approve',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
-                      onPressed: () async {
-                        await provider.approveTutorApplication(
-                          application.id,
-                          application.personalInfo['fullName'] ?? 'Tutor',
-                        );
-                      },
-                      child: const Text(
-                        'Approve Application',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade600,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            await provider.declineTutorApplication(
+                              application.id,
+                              application.personalInfo['fullName'] ?? 'Tutor',
+                            );
+                          },
+                          child: const Text(
+                            'Decline',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ],
@@ -605,29 +672,68 @@ class LecturerDashboardScreen extends StatelessWidget {
       children: [
         Container(
           margin: const EdgeInsets.all(16),
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 24,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text(
+                    'Add Material',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) =>
+                              AddStudyMaterialDialog(provider: provider),
+                    );
+                  },
+                ),
               ),
-            ),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text(
-              'Add Study Material',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder:
-                    (context) => AddStudyMaterialDialog(provider: provider),
-              );
-            },
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade600,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 24,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text(
+                    'Standardize',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) =>
+                              StandardizeMaterialsDialog(provider: provider),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -671,12 +777,37 @@ class LecturerDashboardScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              material.subject,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    material.subject,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (material.isStandardized)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Standardized',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.blue.shade700,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -716,6 +847,12 @@ class LecturerDashboardScreen extends StatelessWidget {
                           ],
                         ),
                       ),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red.shade600),
+                        onPressed: () async {
+                          await provider.deleteStudyMaterial(material.id);
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -727,212 +864,284 @@ class LecturerDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildModernAnalyticsTab(
+  Widget _buildModernSessionsTab(
     BuildContext context,
     LecturerDashboardProvider provider,
   ) {
-    return SingleChildScrollView(
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildAnalyticsSection(
-            'Weekly Activity',
-            Icons.calendar_today_rounded,
-            provider.weeklyActivities
-                .map((activity) => _buildActivityCard(activity))
-                .toList(),
-          ),
-          const SizedBox(height: 32),
-          _buildAnalyticsSection(
-            'Subject Distribution',
-            Icons.pie_chart_rounded,
-            provider.subjectDistributions
-                .map((dist) => _buildSubjectCard(dist))
-                .toList(),
-          ),
-          const SizedBox(height: 32),
-          _buildAnalyticsSection(
-            'Sessions',
-            Icons.schedule_rounded,
-            provider.sessions
-                .map((session) => _buildSessionCard(context, provider, session))
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnalyticsSection(
-    String title,
-    IconData icon,
-    List<Widget> children,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+      itemCount: provider.sessions.length,
+      itemBuilder: (context, index) {
+        final session = provider.sessions[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(icon, color: const Color(0xFF6366F1), size: 20),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ...children,
-      ],
-    );
-  }
-
-  Widget _buildActivityCard(dynamic activity) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              activity.day,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-          Text(
-            '${activity.sessions} sessions • ${activity.duration} min',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubjectCard(dynamic dist) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: dist.color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              dist.subject,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-          Text(
-            '${dist.count}',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionCard(
-    BuildContext context,
-    LecturerDashboardProvider provider,
-    dynamic session,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  session.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            session.isActive
+                                ? Colors.green.shade100
+                                : Colors.grey.shade100,
+                      ),
+                      child: Icon(
+                        session.isActive ? Icons.videocam : Icons.history,
+                        color:
+                            session.isActive
+                                ? Colors.green.shade700
+                                : Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            session.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${session.formattedDateTime} • ${session.statusText}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (session.canCancel)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.cancel_rounded,
+                            color: Colors.red.shade600,
+                          ),
+                          onPressed: () async {
+                            await provider.sessionRepository.cancelSession(
+                              FirebaseConfig.firebaseAuth.currentUser?.uid ??
+                                  '',
+                              session.id,
+                            );
+                            provider.fetchSessions();
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+                if (session.isActive) ...[
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    value: session.progress,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: AlwaysStoppedAnimation(Colors.blue.shade600),
+                    minHeight: 6,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${session.formattedDateTime} • ${session.statusText}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Progress: ${(session.progress * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                ],
               ],
             ),
           ),
-          if (session.canCancel)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: IconButton(
-                icon: Icon(Icons.cancel_rounded, color: Colors.red.shade600),
-                onPressed: () async {
-                  await provider.sessionRepository.cancelSession(
-                    FirebaseConfig.firebaseAuth.currentUser?.uid ?? '',
-                    session.id,
-                  );
-                  provider.fetchSessions();
-                },
-              ),
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
+
+  // Widget _buildModernReportsTab(
+  //   BuildContext context,
+  //   LecturerDashboardProvider provider,
+  // ) {
+  //   return SingleChildScrollView(
+  //     padding: const EdgeInsets.all(16),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         _buildAnalyticsSection('Tutoring Effectiveness', Icons.trending_up, [
+  //           CustomBarChart(
+  //             data: provider.tutoringEffectiveness,
+  //             isEffectiveness: true,
+  //           ),
+  //           const SizedBox(height: 16),
+  //           _buildEffectivenessSummary(provider.tutoringEffectiveness),
+  //         ]),
+  //         const SizedBox(height: 32),
+  //         _buildAnalyticsSection('Student Progress', Icons.school, [
+  //           CustomBarChart(
+  //             data: provider.studentProgress,
+  //             isEffectiveness: false,
+  //           ),
+  //           const SizedBox(height: 16),
+  //           _buildProgressSummary(provider.studentProgress),
+  //         ]),
+  //         const SizedBox(height: 32),
+  //         ElevatedButton(
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: const Color(0xFF6366F1),
+  //             foregroundColor: Colors.white,
+  //             elevation: 0,
+  //             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+  //             shape: RoundedRectangleBorder(
+  //               borderRadius: BorderRadius.circular(16),
+  //             ),
+  //           ),
+  //           onPressed: () async {
+  //             await provider.generateDetailedReport();
+  //             ScaffoldMessenger.of(context).showSnackBar(
+  //               SnackBar(content: Text('Report generated and saved')),
+  //             );
+  //           },
+  //           child: const Text(
+  //             'Generate Detailed Report',
+  //             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  // Widget _buildEffectivenessSummary(List<EffectivenessData> data) {
+  //   final avgScore =
+  //       data.isNotEmpty
+  //           ? data.fold(0.0, (sum, item) => sum + item.effectivenessScore) /
+  //               data.length
+  //           : 0.0;
+  //   return Container(
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(12),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.05),
+  //           blurRadius: 8,
+  //           offset: const Offset(0, 2),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Text(
+  //           'Effectiveness Summary',
+  //           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  //         ),
+  //         const SizedBox(height: 8),
+  //         Text(
+  //           'Average Effectiveness: ${avgScore.toStringAsFixed(1)}',
+  //           style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+  //         ),
+  //         Text(
+  //           'Total Tutors: ${data.length}',
+  //           style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  // Widget _buildProgressSummary(List<ProgressData> data) {
+  //   final avgProgress =
+  //       data.isNotEmpty
+  //           ? data.fold(0.0, (sum, item) => sum + item.progressScore) /
+  //               data.length
+  //           : 0.0;
+  //   return Container(
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(12),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.05),
+  //           blurRadius: 8,
+  //           offset: const Offset(0, 2),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Text(
+  //           'Progress Summary',
+  //           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  //         ),
+  //         const SizedBox(height: 8),
+  //         Text(
+  //           'Average Progress: ${(avgProgress * 100).toStringAsFixed(1)}%',
+  //           style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+  //         ),
+  //         Text(
+  //           'Total Students: ${data.length}',
+  //           style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  // Widget _buildAnalyticsSection(
+  //   String title,
+  //   IconData icon,
+  //   List<Widget> children,
+  // ) {
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Row(
+  //         children: [
+  //           Container(
+  //             padding: const EdgeInsets.all(8),
+  //             decoration: BoxDecoration(
+  //               color: const Color(0xFF6366F1).withOpacity(0.1),
+  //               borderRadius: BorderRadius.circular(8),
+  //             ),
+  //             child: Icon(icon, color: const Color(0xFF6366F1), size: 20),
+  //           ),
+  //           const SizedBox(width: 12),
+  //           Text(
+  //             title,
+  //             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+  //           ),
+  //         ],
+  //       ),
+  //       const SizedBox(height: 16),
+  //       ...children,
+  //     ],
+  //   );
+  // }
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
@@ -948,444 +1157,531 @@ class LecturerDashboardScreen extends StatelessWidget {
   }
 }
 
-// Modern Tutor Details Screen
-class TutorDetailsScreen extends StatelessWidget {
-  final Tutor tutor;
+// Custom Bar Chart Widget
+class CustomBarChart extends StatelessWidget {
+  final List<dynamic> data;
+  final bool isEffectiveness;
 
-  const TutorDetailsScreen({Key? key, required this.tutor}) : super(key: key);
+  const CustomBarChart({
+    Key? key,
+    required this.data,
+    required this.isEffectiveness,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 200,
-            pinned: true,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 40),
-                        Hero(
-                          tag: 'tutor-${tutor.id}',
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              image:
-                                  tutor.profilePicture != null
-                                      ? DecorationImage(
-                                        image: NetworkImage(
-                                          tutor.profilePicture!,
-                                        ),
-                                        fit: BoxFit.cover,
-                                      )
-                                      : null,
-                            ),
-                            child:
-                                tutor.profilePicture == null
-                                    ? Center(
-                                      child: Text(
-                                        tutor.name[0].toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Color(0xFF6366F1),
-                                          fontSize: 32,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    )
-                                    : null,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          tutor.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoCard(
-                    'Bio',
-                    tutor.bio ?? 'N/A',
-                    Icons.person_outline,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildInfoCard(
-                    'Education',
-                    tutor.education ?? 'N/A',
-                    Icons.school_outlined,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildInfoCard(
-                    'Experience',
-                    tutor.experience ?? 'N/A',
-                    Icons.work_outline,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildInfoCard(
-                    'Teaching Style',
-                    tutor.teachingStyle ?? 'N/A',
-                    Icons.psychology_outlined,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildRatingCard(tutor.rating),
-                  const SizedBox(height: 16),
-                  _buildSubjectsCard(tutor.subjects),
-                  const SizedBox(height: 16),
-                  _buildAvailabilityCard(tutor.availability),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            tutor.isAvailable
-                                ? Colors.red.shade600
-                                : Colors.green.shade600,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      icon: Icon(
-                        tutor.isAvailable
-                            ? Icons.pause_circle
-                            : Icons.play_circle,
-                      ),
-                      label: Text(
-                        tutor.isAvailable
-                            ? 'Disable Availability'
-                            : 'Enable Availability',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      onPressed: () async {
-                        await FirebaseConfig.firestore
-                            .collection('tutors')
-                            .doc(tutor.id)
-                            .update({'is_available': !tutor.isAvailable});
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(String title, String content, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      height: 300,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6366F1).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: const Color(0xFF6366F1), size: 20),
+          Text(
+            isEffectiveness
+                ? 'Tutor Effectiveness Scores'
+                : 'Student Progress Scores',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(height: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  content,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: CustomPaint(
+              painter: BarChartPainter(
+                data: data,
+                isEffectiveness: isEffectiveness,
+              ),
+              child: Container(),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRatingCard(double rating) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.star, color: Colors.amber.shade700, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Rating',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    rating.toStringAsFixed(1),
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Row(
-                    children: List.generate(5, (index) {
-                      return Icon(
-                        index < rating.floor()
-                            ? Icons.star
-                            : index < rating
-                            ? Icons.star_half
-                            : Icons.star_border,
-                        color: Colors.amber.shade600,
-                        size: 16,
-                      );
-                    }),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubjectsCard(List<String> subjects) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.subject,
-                  color: Color(0xFF6366F1),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                'Subjects',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                subjects.map((subject) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      subject,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF6366F1),
-                      ),
-                    ),
-                  );
-                }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvailabilityCard(Map<String, dynamic> availability) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.schedule,
-                  color: Colors.green.shade700,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                'Availability',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ...availability.entries.map((entry) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      entry.key,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      (entry.value as List).join(', '),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
         ],
       ),
     );
   }
 }
+
+class BarChartPainter extends CustomPainter {
+  final List<dynamic> data;
+  final bool isEffectiveness;
+
+  BarChartPainter({required this.data, required this.isEffectiveness});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final barPaint =
+        Paint()
+          ..color =
+              isEffectiveness ? Colors.blue.shade600 : Colors.green.shade600
+          ..style = PaintingStyle.fill;
+
+    final axisPaint =
+        Paint()
+          ..color = Colors.grey.shade600
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1;
+
+    final textPainter = TextPainter(textAlign: TextAlign.center);
+
+    const padding = 40.0;
+    final barWidth = (size.width - padding * 2) / data.length / 2;
+    final maxValue = isEffectiveness ? 5.0 : 1.0;
+    final heightScale = (size.height - padding * 2) / maxValue;
+
+    // Draw axes
+    canvas.drawLine(
+      Offset(padding, size.height - padding),
+      Offset(size.width - padding, size.height - padding),
+      axisPaint,
+    );
+    canvas.drawLine(
+      Offset(padding, size.height - padding),
+      Offset(padding, padding),
+      axisPaint,
+    );
+
+    // Draw bars and labels
+    for (var i = 0; i < data.length; i++) {
+      final item = data[i];
+      final value =
+          isEffectiveness ? item.effectivenessScore : item.progressScore;
+      final barHeight = value * heightScale;
+      final x = padding + i * (barWidth * 2);
+      final y = size.height - padding - barHeight;
+
+      // Draw bar
+      canvas.drawRect(Rect.fromLTWH(x, y, barWidth, barHeight), barPaint);
+
+      // Draw name label
+      textPainter.text = TextSpan(
+        text:
+            isEffectiveness
+                ? item.tutorName.substring(0, 3)
+                : item.studentName.substring(0, 3),
+        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          x + barWidth / 2 - textPainter.width / 2,
+          size.height - padding + 8,
+        ),
+      );
+
+      // Draw value label
+      textPainter.text = TextSpan(
+        text:
+            isEffectiveness
+                ? value.toStringAsFixed(1)
+                : '${(value * 100).toStringAsFixed(0)}%',
+        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(x + barWidth / 2 - textPainter.width / 2, y - 20),
+      );
+    }
+
+    // Draw Y-axis labels
+    for (var i = 0; i <= 5; i++) {
+      final yValue = (maxValue / 5) * i;
+      final yPos = size.height - padding - (yValue * heightScale);
+      textPainter.text = TextSpan(
+        text:
+            isEffectiveness
+                ? yValue.toStringAsFixed(1)
+                : '${(yValue * 100).toInt()}%',
+        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(padding - textPainter.width - 8, yPos - textPainter.height / 2),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// Assign Peer Tutor Dialog
+class AssignPeerTutorDialog extends StatefulWidget {
+  final LecturerDashboardProvider provider;
+  final Tutor tutor;
+
+  const AssignPeerTutorDialog({
+    Key? key,
+    required this.provider,
+    required this.tutor,
+  }) : super(key: key);
+
+  @override
+  _AssignPeerTutorDialogState createState() => _AssignPeerTutorDialogState();
+}
+
+class _AssignPeerTutorDialogState extends State<AssignPeerTutorDialog> {
+  final _formKey = GlobalKey<FormState>();
+  String _studentId = '';
+  String _subject = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Container(
+        width: 400,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.person_add,
+                    color: Color(0xFF6366F1),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Assign Peer Tutor: ${widget.tutor.name}',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    decoration: InputDecoration(
+                      labelText: 'Student ID',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    validator: (value) => value!.isEmpty ? 'Required' : null,
+                    onSaved: (value) => _studentId = value!,
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      labelText: 'Subject',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    items:
+                        widget.tutor.subjects
+                            .map(
+                              (subject) => DropdownMenuItem(
+                                value: subject,
+                                child: Text(subject),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: (value) => _subject = value!,
+                    validator: (value) => value == null ? 'Required' : null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      if (_formKey.currentState!.validate()) {
+                        _formKey.currentState!.save();
+                        await widget.provider.assignPeerTutor(
+                          widget.tutor.id,
+                          _studentId,
+                          _subject,
+                        );
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Tutor assigned successfully'),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text(
+                      'Assign Tutor',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Standardize Materials Dialog
+class StandardizeMaterialsDialog extends StatefulWidget {
+  final LecturerDashboardProvider provider;
+
+  const StandardizeMaterialsDialog({Key? key, required this.provider})
+    : super(key: key);
+
+  @override
+  _StandardizeMaterialsDialogState createState() =>
+      _StandardizeMaterialsDialogState();
+}
+
+class _StandardizeMaterialsDialogState
+    extends State<StandardizeMaterialsDialog> {
+  final _formKey = GlobalKey<FormState>();
+  String _materialId = '';
+  String _standardNotes = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Container(
+        width: 400,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.upload_file,
+                    color: Color(0xFF6366F1),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Standardize Study Material',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      labelText: 'Select Material',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    items:
+                        widget.provider.studyMaterials
+                            .map(
+                              (material) => DropdownMenuItem(
+                                value: material.id,
+                                child: Text(material.subject),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: (value) => _materialId = value!,
+                    validator: (value) => value == null ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    decoration: InputDecoration(
+                      labelText: 'Standardization Notes',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    maxLines: 3,
+                    validator: (value) => value!.isEmpty ? 'Required' : null,
+                    onSaved: (value) => _standardNotes = value!,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      if (_formKey.currentState!.validate()) {
+                        _formKey.currentState!.save();
+                        await widget.provider.standardizeStudyMaterial(
+                          _materialId,
+                          _standardNotes,
+                        );
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Material standardized successfully'),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text(
+                      'Standardize',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Modern Tutor Details Screen
 
 // Modern Add Study Material Dialog
 class AddStudyMaterialDialog extends StatefulWidget {
@@ -1410,8 +1706,9 @@ class _AddStudyMaterialDialogState extends State<AddStudyMaterialDialog> {
     Icons.biotech,
     Icons.code,
     Icons.menu_book,
+    Icons.book,
   ];
-  IconData _selectedIcon = Icons.book;
+  late IconData _selectedIcon;
   final _colors = [
     Colors.blue,
     Colors.green,
@@ -1420,6 +1717,12 @@ class _AddStudyMaterialDialogState extends State<AddStudyMaterialDialog> {
     Colors.orange,
   ];
   Color _selectedColor = Colors.blue;
+  bool _isStandardized = false;
+  @override
+  void initState() {
+    super.initState();
+    _selectedIcon = _icons.first;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1529,11 +1832,19 @@ class _AddStudyMaterialDialogState extends State<AddStudyMaterialDialog> {
                     validator: (value) {
                       if (value!.isEmpty) return 'Required';
                       final progress = double.tryParse(value);
-                      if (progress == null || progress < 0 || progress > 1)
+                      if (progress == null || progress < 0 || progress > 1) {
                         return 'Must be between 0 and 1';
+                      }
                       return null;
                     },
                     onSaved: (value) => _progress = double.parse(value!),
+                  ),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    title: const Text('Standardized Material'),
+                    value: _isStandardized,
+                    onChanged:
+                        (value) => setState(() => _isStandardized = value!),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -1687,6 +1998,7 @@ class _AddStudyMaterialDialogState extends State<AddStudyMaterialDialog> {
                           progress: _progress,
                           color: _selectedColor,
                           icon: _selectedIcon,
+                          isStandardized: _isStandardized,
                         );
                         Navigator.pop(context);
                       }

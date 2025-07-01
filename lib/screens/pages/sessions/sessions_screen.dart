@@ -33,12 +33,16 @@ class _SessionsScreenState extends State<SessionsScreen>
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     _userId = appProvider.currentUser?.id ?? '';
 
-    // Load initial data
-    _loadSessions();
+    // Defer loading until after build completes to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSessions();
+    });
 
     // Set up periodic refresh every 30 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      _loadSessions(forceRefresh: true);
+      if (mounted) {
+        _loadSessions(forceRefresh: true);
+      }
     });
   }
 
@@ -50,18 +54,24 @@ class _SessionsScreenState extends State<SessionsScreen>
   }
 
   Future<void> _loadSessions({bool forceRefresh = false}) async {
-    await _sessionProvider.loadUpcomingSessions(
-      _userId,
-      forceRefresh: forceRefresh,
-    );
-    await _sessionProvider.loadPastSessions(
-      _userId,
-      forceRefresh: forceRefresh,
-    );
-    await _sessionProvider.loadPendingSessions(
-      _userId,
-      forceRefresh: forceRefresh,
-    );
+    if (!mounted) return;
+
+    try {
+      await Future.wait([
+        _sessionProvider.loadUpcomingSessions(
+          _userId,
+          forceRefresh: forceRefresh,
+        ),
+        _sessionProvider.loadPastSessions(_userId, forceRefresh: forceRefresh),
+        _sessionProvider.loadPendingSessions(
+          _userId,
+          forceRefresh: forceRefresh,
+        ),
+      ]);
+    } catch (e) {
+      // Handle error silently or show a snackbar
+      debugPrint('Error loading sessions: $e');
+    }
   }
 
   void _navigateToSessionScreen(Session session) {

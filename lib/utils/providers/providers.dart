@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
+import 'dart:async';
 
 import '../modelsAndRepsositories/models_and_repositories.dart';
 
@@ -37,6 +39,8 @@ extension SessionExtension on Session {
     double? price,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isActive,
+    double? progress,
   }) {
     return Session(
       id: id ?? this.id,
@@ -67,7 +71,72 @@ extension SessionExtension on Session {
       price: price ?? this.price,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isActive: isActive ?? this.isActive,
+      progress: progress ?? this.progress,
     );
+  }
+}
+
+/// Extension to create a copy of StudyMaterial with updated fields
+extension StudyMaterialExtension on StudyMaterial {
+  StudyMaterial copyWith({
+    String? id,
+    String? subject,
+    int? resourceCount,
+    double? progress,
+    Color? color,
+    IconData? icon,
+    bool? isStandardized,
+  }) {
+    return StudyMaterial(
+      id: id ?? this.id,
+      subject: subject ?? this.subject,
+      resourceCount: resourceCount ?? this.resourceCount,
+      progress: progress ?? this.progress,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      isStandardized: isStandardized ?? this.isStandardized,
+    );
+  }
+}
+
+/// Data models for analytics
+class EffectivenessData {
+  final String tutorName;
+  final double effectivenessScore;
+
+  EffectivenessData({
+    required this.tutorName,
+    required this.effectivenessScore,
+  });
+
+  factory EffectivenessData.fromJson(Map<String, dynamic> json) {
+    return EffectivenessData(
+      tutorName: json['tutorName'] ?? '',
+      effectivenessScore: (json['effectivenessScore'] ?? 0.0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'tutorName': tutorName, 'effectivenessScore': effectivenessScore};
+  }
+}
+
+class ProgressData {
+  final String studentName;
+  final double progressScore;
+
+  ProgressData({required this.studentName, required this.progressScore});
+
+  factory ProgressData.fromJson(Map<String, dynamic> json) {
+    return ProgressData(
+      studentName: json['studentName'] ?? '',
+      progressScore: (json['progressScore'] ?? 0.0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'studentName': studentName, 'progressScore': progressScore};
   }
 }
 
@@ -447,7 +516,16 @@ class SessionProvider extends BaseProvider {
 
     _isLoading = true;
     clearError();
-    notifyListeners();
+
+    // Don't call notifyListeners() immediately if called during build
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    } else {
+      notifyListeners();
+    }
 
     try {
       final response = await _repository.getUpcomingSessions(userId);
@@ -460,7 +538,16 @@ class SessionProvider extends BaseProvider {
       rethrow;
     } finally {
       _isLoading = false;
-      notifyListeners();
+
+      // Safe notifyListeners call
+      if (WidgetsBinding.instance.schedulerPhase ==
+          SchedulerPhase.persistentCallbacks) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+      } else {
+        notifyListeners();
+      }
     }
   }
 
@@ -1117,41 +1204,6 @@ class TutorProvider extends BaseProvider {
       notifyListeners();
     }
   }
-
-  Future<void> approveTutorApplication({
-    required String applicationId,
-    required String name,
-    String? bio,
-    String? education,
-    String? experience,
-    String? teachingStyle,
-    String? profilePicture,
-  }) async {
-    _isLoading = true;
-    clearError();
-    notifyListeners();
-
-    try {
-      final response = await _repository.approveTutorApplication(
-        applicationId: applicationId,
-        name: name,
-        bio: bio,
-        education: education,
-        experience: experience,
-        teachingStyle: teachingStyle,
-        profilePicture: profilePicture,
-      );
-      _tutors = [...?_tutors, response.data!];
-      _tutorApplications =
-          _tutorApplications?.where((app) => app.id != applicationId).toList();
-    } on ApiError catch (e) {
-      _error = e.message;
-      rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
 }
 
 /// Chat Provider
@@ -1600,7 +1652,7 @@ class SavedItemsProvider extends BaseProvider {
 }
 
 /// Lecturer Dashboard Provider
-class LecturerDashboardProvider with ChangeNotifier {
+class LecturerDashboardProvider extends BaseProvider {
   final TutorRepository _tutorRepository = TutorRepository();
   final StudyMaterialsRepository _studyMaterialsRepository =
       StudyMaterialsRepository();
@@ -1610,39 +1662,47 @@ class LecturerDashboardProvider with ChangeNotifier {
   List<Tutor> _tutors = [];
   List<TutorApplication> _tutorApplications = [];
   List<StudyMaterial> _studyMaterials = [];
+  List<EffectivenessData> _tutoringEffectiveness = [];
+  List<ProgressData> _studentProgress = [];
+  List<Session> _sessions = [];
   List<WeeklyActivity> _weeklyActivities = [];
   List<SubjectDistribution> _subjectDistributions = [];
-  List<Session> _sessions = [];
-  bool _isLoading = false;
-  String? _errorMessage;
+  StreamSubscription? _sessionStreamSubscription;
 
   List<Tutor> get tutors => _tutors;
   List<TutorApplication> get tutorApplications => _tutorApplications;
   List<StudyMaterial> get studyMaterials => _studyMaterials;
+  List<EffectivenessData> get tutoringEffectiveness => _tutoringEffectiveness;
+  List<ProgressData> get studentProgress => _studentProgress;
+  List<Session> get sessions => _sessions;
   List<WeeklyActivity> get weeklyActivities => _weeklyActivities;
   List<SubjectDistribution> get subjectDistributions => _subjectDistributions;
-  List<Session> get sessions => _sessions;
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
 
-  Future<void> fetchTutors() async {
+  Future<void> fetchTutors({bool forceRefresh = false}) async {
+    if (!forceRefresh && isCacheValid(const Duration(minutes: 5))) return;
+
     _isLoading = true;
+    clearError();
     notifyListeners();
 
     try {
       final response = await _tutorRepository.getTutors(limit: 50);
       _tutors = response.data ?? [];
-      _errorMessage = null;
+      _lastFetched = DateTime.now();
+      _error = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> fetchTutorApplications() async {
+  Future<void> fetchTutorApplications({bool forceRefresh = false}) async {
+    if (!forceRefresh && isCacheValid(const Duration(minutes: 5))) return;
+
     _isLoading = true;
+    clearError();
     notifyListeners();
 
     try {
@@ -1650,40 +1710,151 @@ class LecturerDashboardProvider with ChangeNotifier {
         FirebaseConfig.firebaseAuth.currentUser?.uid ?? '',
       );
       _tutorApplications = response.data ?? [];
-      _errorMessage = null;
+      _lastFetched = DateTime.now();
+      _error = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> approveTutorApplication(
+  Future<void> approveTutorApplication({
+    required String applicationId,
+    String? bio,
+    String? education,
+    String? experience,
+    String? teachingStyle,
+    String? profilePicture,
+  }) async {
+    _isLoading = true;
+    clearError();
+    notifyListeners();
+
+    try {
+      final response = await _tutorRepository.approveTutorApplication(
+        applicationId: applicationId,
+        bio: bio,
+        education: education,
+        experience: experience,
+        teachingStyle: teachingStyle,
+        profilePicture: profilePicture,
+      );
+      _tutors = [..._tutors, response.data!];
+      _tutorApplications =
+          _tutorApplications.where((app) => app.id != applicationId).toList();
+      _error = null;
+    } catch (e) {
+      if (e is ApiError) {
+        _error = e.message;
+      } else {
+        _error = e.toString();
+      }
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> declineTutorApplication(
     String applicationId,
     String name,
   ) async {
     _isLoading = true;
+    clearError();
     notifyListeners();
 
     try {
-      await _tutorRepository.approveTutorApplication(
-        applicationId: applicationId,
-        name: name,
-      );
+      await _tutorRepository.declineTutorApplication(applicationId);
       _tutorApplications.removeWhere((app) => app.id == applicationId);
-      await fetchTutors();
-      _errorMessage = null;
+      _error = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> fetchStudyMaterials(String userId) async {
+  Future<void> assignPeerTutor(
+    String tutorId,
+    String studentId,
+    String subject,
+  ) async {
     _isLoading = true;
+    clearError();
+    notifyListeners();
+
+    try {
+      // Validate inputs
+      if (tutorId.isEmpty || studentId.isEmpty || subject.isEmpty) {
+        throw ApiError(
+          message:
+              'Invalid input: Tutor ID, Student ID, and Subject are required',
+        );
+      }
+
+      // Check if tutor exists
+      final tutorDoc =
+          await FirebaseConfig.firestore
+              .collection('tutors')
+              .doc(tutorId)
+              .get();
+      if (!tutorDoc.exists) {
+        throw ApiError(message: 'Tutor not found');
+      }
+
+      // Check if student exists
+      final studentDoc =
+          await FirebaseConfig.firestore
+              .collection('users')
+              .doc(studentId)
+              .get();
+      if (!studentDoc.exists) {
+        throw ApiError(message: 'Student not found');
+      }
+
+      // Create assignment
+      final assignmentId =
+          FirebaseConfig.firestore.collection('peer_assignments').doc().id;
+      final assignmentData = {
+        'tutorId': tutorId,
+        'studentId': studentId,
+        'subject': subject,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'active',
+      };
+
+      await FirebaseConfig.firestore
+          .collection('peer_assignments')
+          .doc(assignmentId)
+          .set(assignmentData);
+
+      // Update tutor's assignments
+      await FirebaseConfig.firestore.collection('tutors').doc(tutorId).update({
+        'assignments': FieldValue.arrayUnion([assignmentId]),
+      });
+
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchStudyMaterials(
+    String userId, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && isCacheValid(const Duration(minutes: 30))) return;
+
+    _isLoading = true;
+    clearError();
     notifyListeners();
 
     try {
@@ -1691,9 +1862,10 @@ class LecturerDashboardProvider with ChangeNotifier {
         userId,
       );
       _studyMaterials = response.data ?? [];
-      _errorMessage = null;
+      _lastFetched = DateTime.now();
+      _error = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -1707,8 +1879,10 @@ class LecturerDashboardProvider with ChangeNotifier {
     required double progress,
     required Color color,
     required IconData icon,
+    bool isStandardized = false,
   }) async {
     _isLoading = true;
+    clearError();
     notifyListeners();
 
     try {
@@ -1719,59 +1893,243 @@ class LecturerDashboardProvider with ChangeNotifier {
         progress: progress,
         color: color,
         icon: icon,
+        isStandardized: isStandardized,
       );
       await FirebaseConfig.firestore
-          .collection('users')
-          .doc(userId)
           .collection('study_materials')
           .doc(material.id)
           .set(material.toJson());
-      await fetchStudyMaterials(userId);
-      _errorMessage = null;
+      await fetchStudyMaterials(userId, forceRefresh: true);
+      _error = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> fetchAnalytics(String userId) async {
+  Future<void> standardizeStudyMaterial(
+    String materialId,
+    String standardNotes,
+  ) async {
     _isLoading = true;
+    clearError();
     notifyListeners();
 
     try {
-      final weeklyResponse = await _analyticsRepository.getWeeklyActivity(
-        userId,
+      await FirebaseConfig.firestore
+          .collection('study_materials')
+          .doc(materialId)
+          .update({
+            'isStandardized': true,
+            'standardNotes': standardNotes,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+      await fetchStudyMaterials(
+        FirebaseConfig.firebaseAuth.currentUser?.uid ?? '',
+        forceRefresh: true,
       );
-      final subjectResponse = await _analyticsRepository.getSubjectDistribution(
-        userId,
-      );
-      _weeklyActivities = weeklyResponse.data ?? [];
-      _subjectDistributions = subjectResponse.data ?? [];
-      _errorMessage = null;
+      _error = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> fetchSessions() async {
+  Future<void> deleteStudyMaterial(String materialId) async {
     _isLoading = true;
+    clearError();
+    notifyListeners();
+
+    try {
+      await FirebaseConfig.firestore
+          .collection('study_materials')
+          .doc(materialId)
+          .delete();
+      await fetchStudyMaterials(
+        FirebaseConfig.firebaseAuth.currentUser?.uid ?? '',
+        forceRefresh: true,
+      );
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchAnalytics(
+    String userId, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && isCacheValid(const Duration(minutes: 30))) return;
+
+    _isLoading = true;
+    clearError();
+    notifyListeners();
+
+    try {
+      final responses = await Future.wait([
+        _analyticsRepository.getWeeklyActivity(userId),
+        _analyticsRepository.getSubjectDistribution(userId),
+        FirebaseConfig.firestore
+            .collection('analytics')
+            .doc(userId)
+            .collection('tutoring_effectiveness')
+            .get()
+            .then(
+              (snapshot) =>
+                  snapshot.docs
+                      .map((doc) => EffectivenessData.fromJson(doc.data()))
+                      .toList(),
+            ),
+        FirebaseConfig.firestore
+            .collection('analytics')
+            .doc(userId)
+            .collection('student_progress')
+            .get()
+            .then(
+              (snapshot) =>
+                  snapshot.docs
+                      .map((doc) => ProgressData.fromJson(doc.data()))
+                      .toList(),
+            ),
+      ]);
+      _weeklyActivities =
+          (responses[0] as ApiResponse<List<WeeklyActivity>>).data ?? [];
+      _subjectDistributions =
+          (responses[1] as ApiResponse<List<SubjectDistribution>>).data ?? [];
+      _tutoringEffectiveness = (responses[2] as List).cast<EffectivenessData>();
+      _studentProgress = (responses[3] as List).cast<ProgressData>();
+      _lastFetched = DateTime.now();
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchSessions({bool forceRefresh = false}) async {
+    if (!forceRefresh && isCacheValid(const Duration(minutes: 5))) return;
+
+    _isLoading = true;
+    clearError();
     notifyListeners();
 
     try {
       final response = await sessionRepository.getAvailableSessions();
-      _sessions = response.data ?? [];
-      _errorMessage = null;
+      _sessions =
+          response.data
+              ?.map(
+                (session) => session.copyWith(
+                  isActive:
+                      session.startTime.isBefore(DateTime.now()) &&
+                      session.startTime
+                          .add(session.duration)
+                          .isAfter(DateTime.now()),
+                  progress: _calculateSessionProgress(session),
+                ),
+              )
+              .toList() ??
+          [];
+      _lastFetched = DateTime.now();
+      _error = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void startRealTimeSessionMonitoring() {
+    _sessionStreamSubscription?.cancel();
+    _sessionStreamSubscription = FirebaseConfig.firestore
+        .collection('sessions')
+        .snapshots()
+        .listen(
+          (snapshot) async {
+            try {
+              final response = await sessionRepository.getAvailableSessions();
+              _sessions =
+                  response.data
+                      ?.map(
+                        (session) => session.copyWith(
+                          isActive:
+                              session.startTime.isBefore(DateTime.now()) &&
+                              session.startTime
+                                  .add(session.duration)
+                                  .isAfter(DateTime.now()),
+                          progress: _calculateSessionProgress(session),
+                        ),
+                      )
+                      .toList() ??
+                  [];
+              _error = null;
+            } catch (e) {
+              _error = e.toString();
+            }
+            notifyListeners();
+          },
+          onError: (e) {
+            _error = e.toString();
+            notifyListeners();
+          },
+        );
+  }
+
+  Future<void> generateDetailedReport() async {
+    _isLoading = true;
+    clearError();
+    notifyListeners();
+
+    try {
+      final reportId = DateTime.now().millisecondsSinceEpoch.toString();
+      final reportData = {
+        'tutoringEffectiveness':
+            _tutoringEffectiveness.map((e) => e.toJson()).toList(),
+        'studentProgress': _studentProgress.map((e) => e.toJson()).toList(),
+        'weeklyActivities': _weeklyActivities.map((e) => e.toJson()).toList(),
+        'subjectDistributions':
+            _subjectDistributions.map((e) => e.toJson()).toList(),
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      await FirebaseConfig.firestore
+          .collection('reports')
+          .doc(reportId)
+          .set(reportData);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  double _calculateSessionProgress(Session session) {
+    if (!session.isActive) return 0.0;
+    final now = DateTime.now();
+    final start = session.startTime;
+    final end = start.add(session.duration);
+    if (now.isBefore(start)) return 0.0;
+    if (now.isAfter(end)) return 1.0;
+    final totalDuration = end.difference(start).inSeconds;
+    final elapsed = now.difference(start).inSeconds;
+    return elapsed / totalDuration;
+  }
+
+  @override
+  void dispose() {
+    _sessionStreamSubscription?.cancel();
+    super.dispose();
   }
 }
 
@@ -1834,5 +2192,6 @@ List<SingleChildWidget> getProviders() {
       create: (_) => PracticeTestsProvider(PracticeTestsRepository()),
       update: (_, __, provider) => provider!,
     ),
+    ChangeNotifierProvider(create: (_) => LecturerDashboardProvider()),
   ];
 }

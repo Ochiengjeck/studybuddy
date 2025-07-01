@@ -52,11 +52,23 @@ class ApiError {
   ApiError({required this.message, this.code, this.errors});
 
   factory ApiError.fromFirebaseException(dynamic e) {
-    return ApiError(
-      message: e.message ?? 'An error occurred',
-      code: e.code,
-      errors: null,
-    );
+    String msg;
+    String? code;
+    if (e is FirebaseException) {
+      msg = e.message ?? e.code;
+      code = e.code;
+    } else if (e is Exception) {
+      msg = e.toString();
+      code = null;
+    } else if (e != null && e.toString().isNotEmpty) {
+      msg = e.toString();
+      code = null;
+      debugPrint('ApiError: $msg');
+    } else {
+      msg = 'An unknown error occurred';
+      code = null;
+    }
+    return ApiError(message: msg, code: code, errors: null);
   }
 }
 
@@ -358,6 +370,8 @@ class Session {
   final double price;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool isActive;
+  final double progress;
 
   Session({
     required this.id,
@@ -388,6 +402,8 @@ class Session {
     this.recurringPattern,
     this.isPaid = false,
     this.price = 0.0,
+    this.isActive = false,
+    this.progress = 0.0,
   });
 
   factory Session.fromJson(Map<String, dynamic> json) {
@@ -422,6 +438,8 @@ class Session {
       price: _parseDouble(json['price']) ?? 0.0,
       createdAt: _parseDateTime(json['created_at']) ?? DateTime.now(),
       updatedAt: _parseDateTime(json['updated_at']) ?? DateTime.now(),
+      isActive: json['isActive'] ?? false,
+      progress: (json['progress'] ?? 0.0).toDouble(),
     );
   }
 
@@ -454,6 +472,8 @@ class Session {
     'price': price,
     'created_at': Timestamp.fromDate(createdAt),
     'updated_at': Timestamp.fromDate(updatedAt),
+    'isActive': isActive,
+    'progress': progress,
   };
 
   // Computed properties
@@ -1380,6 +1400,7 @@ class StudyMaterial {
   final double progress;
   final Color color;
   final IconData icon;
+  final bool isStandardized;
 
   StudyMaterial({
     required this.id,
@@ -1387,6 +1408,7 @@ class StudyMaterial {
     required this.resourceCount,
     required this.progress,
     required this.color,
+    this.isStandardized = false,
     required this.icon,
   });
 
@@ -1397,6 +1419,7 @@ class StudyMaterial {
     progress: json['progress']?.toDouble() ?? 0.0,
     color: Color(json['color'] ?? 0xFF000000),
     icon: _getIconFromString(json['icon']),
+    isStandardized: json['isStandardized'] ?? false,
   );
 
   Map<String, dynamic> toJson() => {
@@ -1406,6 +1429,7 @@ class StudyMaterial {
     'progress': progress,
     'color': color.value,
     'icon': _getIconString(icon),
+    'isStandardized': isStandardized,
   };
 
   static IconData _getIconFromString(String? iconName) {
@@ -2835,7 +2859,6 @@ class TutorRepository {
 
   Future<ApiResponse<Tutor>> approveTutorApplication({
     required String applicationId,
-    required String name,
     String? bio,
     String? education,
     String? experience,
@@ -2866,26 +2889,24 @@ class TutorRepository {
       final tutorData = {
         'type': 'tutor',
         'userId': applicationData['userId'],
-        'name': name,
         'bio': bio,
         'education': education,
         'experience': experience,
         'teaching_style': teachingStyle,
-        'rating': 0.0,
-        'sessions_completed': 0,
-        'points': 0,
-        'badges': 0,
-        'is_available': true,
         'profile_picture':
             profilePicture ??
-            applicationData['personal_info']['profile_picture'],
+            applicationData['personal_info']?['profile_picture'],
+        'rating': 1.0,
+        'sessions_completed': 0,
+        'points': 12,
+        'badges': 1,
+        'status': 'approved',
+        'is_available': true,
         'subjects': List<String>.from(applicationData['subjects'] ?? []),
-        'availability': Map<String, List<String>>.from(
-          applicationData['availability'] ?? {},
-        ),
+        'availability': applicationData['availability'] ?? {},
         'preferred_teaching_mode': applicationData['teaching_mode'],
         'preferred_venue': applicationData['venue'],
-        'created_at': Timestamp.now(),
+        'created_at': applicationData['submitted_at'] ?? Timestamp.now(),
         'updated_at': Timestamp.now(),
       };
 
@@ -2894,8 +2915,33 @@ class TutorRepository {
       return ApiResponse<Tutor>(
         success: true,
         message: 'Tutor application approved and converted to tutor',
-        data: Tutor.fromJson({...tutorData, 'id': applicationId}),
+        data: Tutor.fromJson({
+          ...applicationData,
+          ...tutorData,
+          'id': applicationId,
+        }),
       );
+    } catch (e) {
+      throw ApiError.fromFirebaseException(e);
+    }
+  }
+
+  Future<void> declineTutorApplication(String applicationId) async {
+    try {
+      final applicationRef = FirebaseConfig.firestore
+          .collection('tutors')
+          .doc(applicationId);
+
+      final applicationDoc = await applicationRef.get();
+      if (!applicationDoc.exists) {
+        throw ApiError(
+          message: 'Tutor application not found',
+          code: 'APPLICATION_NOT_FOUND',
+        );
+      }
+
+      // You can either delete or update the status
+      await applicationRef.delete();
     } catch (e) {
       throw ApiError.fromFirebaseException(e);
     }
@@ -3255,11 +3301,7 @@ class StudyMaterialsRepository {
   ) async {
     try {
       final snapshot =
-          await FirebaseConfig.firestore
-              .collection('users')
-              .doc(userId)
-              .collection('study_materials')
-              .get();
+          await FirebaseConfig.firestore.collection('study_materials').get();
 
       final materials =
           snapshot.docs

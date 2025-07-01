@@ -104,7 +104,7 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Future<void> _updateProfile() async {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState != null && _formKey.currentState!.validate()) {
       final appProvider = context.read<AppProvider>();
       final userId = appProvider.currentUser?.id;
       if (userId != null) {
