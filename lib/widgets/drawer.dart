@@ -122,6 +122,29 @@ class _CustomDrawerState extends State<CustomDrawer>
                     context,
                     listen: false,
                   );
+                  // Clear all relevant providers before logout
+                  final appProvider = Provider.of<AppProvider>(
+                    context,
+                    listen: false,
+                  );
+                  final homeProvider = Provider.of<HomeProvider>(
+                    context,
+                    listen: false,
+                  );
+                  final chatProvider = Provider.of<ChatProvider>(
+                    context,
+                    listen: false,
+                  );
+                  final sessionProvider = Provider.of<SessionProvider>(
+                    context,
+                    listen: false,
+                  );
+                  // Add more providers as needed
+                  appProvider.logout();
+                  homeProvider.clearError();
+                  chatProvider.clearCache();
+                  sessionProvider.clearError();
+                  // If you have clearCache or similar for other providers, call them here
                   try {
                     await authProvider.logout();
                     if (context.mounted) {
@@ -136,9 +159,7 @@ class _CustomDrawerState extends State<CustomDrawer>
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Logout failed: ${e.toString()}'),
-                        ),
+                        SnackBar(content: Text('Logout failed: e.toString()')),
                       );
                     }
                   }
@@ -259,40 +280,6 @@ class _CustomDrawerState extends State<CustomDrawer>
                               subtitle: 'Rankings & Stats',
                               index: 5,
                               isSelected: widget.currentIndex == 5,
-                            ),
-                            _buildDrawerItem(
-                              context,
-                              icon: Icons.analytics_rounded,
-                              title: 'Analytics',
-                              subtitle: 'Study Insights',
-                              index: 7,
-                              isSelected: widget.currentIndex == 7,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSectionHeader('Learning'),
-                            _buildDrawerItem(
-                              context,
-                              icon: Icons.library_books_rounded,
-                              title: 'Study Materials',
-                              subtitle: 'Books & Resources',
-                              index: 8,
-                              isSelected: widget.currentIndex == 8,
-                            ),
-                            _buildDrawerItem(
-                              context,
-                              icon: Icons.quiz_rounded,
-                              title: 'Practice Tests',
-                              subtitle: 'Quizzes & Exams',
-                              index: 9,
-                              isSelected: widget.currentIndex == 9,
-                            ),
-                            _buildDrawerItem(
-                              context,
-                              icon: Icons.bookmark_rounded,
-                              title: 'Saved Items',
-                              subtitle: 'Bookmarks & Notes',
-                              index: 10,
-                              isSelected: widget.currentIndex == 10,
                             ),
                             const SizedBox(height: 16),
                             _buildSectionHeader('Account'),

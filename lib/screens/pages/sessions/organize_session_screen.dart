@@ -19,7 +19,7 @@ class _OrganizeSessionScreenState extends State<OrganizeSessionScreen>
 
   String _selectedSubject = 'Mathematics';
   String _selectedLevel = 'Beginner';
-  String _selectedPlatform = 'Google Meet';
+  String _selectedPlatform = 'Virtual';
   String _recurringPattern = 'Weekly';
   DateTime? _scheduledDateTime;
   Duration _duration = const Duration(hours: 1);
@@ -49,12 +49,7 @@ class _OrganizeSessionScreenState extends State<OrganizeSessionScreen>
     'All Levels',
   ];
 
-  final List<String> _platforms = [
-    'Google Meet',
-    'Zoom',
-    'Microsoft Teams',
-    'Skype',
-  ];
+  final List<String> _platforms = ['Physical', 'Virtual', 'Hybrid', 'Others'];
 
   final List<String> _recurringPatterns = [
     'Daily',
@@ -530,9 +525,12 @@ class _OrganizeSessionScreenState extends State<OrganizeSessionScreen>
                                       ),
                                       value: _isPaid,
                                       onChanged: (value) {
-                                        setState(() {
-                                          _isPaid = value;
-                                        });
+                                        AlertDialog(
+                                          title: Text("No paid services yet"),
+                                        );
+                                        // setState(() {
+                                        //   _isPaid = value;
+                                        // });
                                       },
                                       activeColor:
                                           Theme.of(context).colorScheme.primary,

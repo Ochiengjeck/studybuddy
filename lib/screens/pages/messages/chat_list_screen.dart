@@ -371,27 +371,68 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                                   .split('@')
                                                   .first;
 
-                                      final newChatId = await chatProvider
-                                          .createChat(
-                                            currentUser!.id,
-                                            currentUserName,
-                                            user.id,
-                                            user.fullName,
+                                      // Prevent duplicate conversations: search global 'chats' collection for both user IDs
+                                      final globalChatsSnapshot =
+                                          await FirebaseConfig.firestore
+                                              .collection('chats')
+                                              .where(
+                                                'members',
+                                                arrayContains: currentUser!.id,
+                                              )
+                                              .get();
+                                      QueryDocumentSnapshot<
+                                        Map<String, dynamic>
+                                      >?
+                                      existingChat;
+                                      for (final doc
+                                          in globalChatsSnapshot.docs) {
+                                        final members =
+                                            (doc.data()['members'] ?? [])
+                                                as List<dynamic>;
+                                        if (members.contains(user.id)) {
+                                          existingChat = doc;
+                                          break;
+                                        }
+                                      }
+                                      if (existingChat != null) {
+                                        // Redirect to existing chat
+                                        if (context.mounted) {
+                                          Navigator.pop(context);
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (context) => ChatScreen(
+                                                    chatId: existingChat!.id,
+                                                    name: user.fullName,
+                                                    imageUrl: imageUrl,
+                                                  ),
+                                            ),
                                           );
-
-                                      if (context.mounted) {
-                                        Navigator.pop(context);
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (context) => ChatScreen(
-                                                  chatId: newChatId,
-                                                  name: user.fullName,
-                                                  imageUrl: imageUrl,
-                                                ),
-                                          ),
-                                        );
+                                        }
+                                      } else {
+                                        // Create new chat
+                                        final newChatId = await chatProvider
+                                            .createChat(
+                                              currentUser!.id,
+                                              currentUserName,
+                                              user.id,
+                                              user.fullName,
+                                            );
+                                        if (context.mounted) {
+                                          Navigator.pop(context);
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (context) => ChatScreen(
+                                                    chatId: newChatId,
+                                                    name: user.fullName,
+                                                    imageUrl: imageUrl,
+                                                  ),
+                                            ),
+                                          );
+                                        }
                                       }
                                     } catch (e) {
                                       if (context.mounted) {
@@ -400,7 +441,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                         ).showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              'Failed to start chat: ${e.toString()}',
+                                              'Failed to start chat: e.toString()',
                                             ),
                                           ),
                                         );

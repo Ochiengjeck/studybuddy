@@ -4,7 +4,7 @@ import 'package:studybuddy/screens/auth/log_in.dart';
 import '../screens/pages/tutors/tutor_details_screen.dart';
 import '../utils/modelsAndRepsositories/models_and_repositories.dart';
 import '../utils/providers/providers.dart';
-import 'package:intl/intl.dart';
+import '../widgets/custom_loading.dart';
 
 // Modern Lecturer Dashboard Screen
 class LecturerDashboardScreen extends StatelessWidget {
@@ -41,11 +41,8 @@ class LecturerDashboardScreen extends StatelessWidget {
           body: Consumer<LecturerDashboardProvider>(
             builder: (context, provider, child) {
               if (provider.isLoading) {
-                return const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation(Color(0xFF6366F1)),
-                  ),
+                return Center(
+                  child: StudyBuddyLoadingWidgets.graduationCapLoader(),
                 );
               }
               if (provider.error != null) {

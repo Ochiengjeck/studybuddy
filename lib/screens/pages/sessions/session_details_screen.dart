@@ -1,4 +1,11 @@
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:studybuddy/screens/pages/tutors/tutor_booking_screen.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
 
@@ -360,7 +367,7 @@ class SessionDetailsScreen extends StatelessWidget {
                         subtitle: 'AI-generated summary and key points',
                         color: Colors.teal,
                         onTap: () {
-                          _showSessionNotes(context);
+                          _showRecordingDialog(context);
                         },
                       ),
                     ],
@@ -642,36 +649,31 @@ class SessionDetailsScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         Row(
                           children: List.generate(5, (index) {
-                            return GestureDetector(
-                              onTap: () => setState(() => rating = index + 1),
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 4),
-                                child: Icon(
-                                  index < rating
-                                      ? Icons.star
-                                      : Icons.star_border,
-                                  color: Colors.amber,
-                                  size: 28,
-                                ),
+                            return IconButton(
+                              icon: Icon(
+                                Icons.star,
+                                color:
+                                    index < rating
+                                        ? Colors.amber
+                                        : Colors.grey[300],
                               ),
+                              onPressed:
+                                  () => setState(() => rating = index + 1),
                             );
                           }),
                         ),
                         const SizedBox(height: 20),
                         const Text(
-                          'Your Review:',
+                          'Review:',
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: reviewController,
                           maxLines: 4,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            hintText:
-                                'Share your experience with this session...',
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'Share your experience...',
                           ),
                         ),
                       ],
@@ -683,15 +685,31 @@ class SessionDetailsScreen extends StatelessWidget {
                       child: const Text('Cancel'),
                     ),
                     ElevatedButton(
-                      onPressed: () {
-                        // TODO: Save feedback to backend
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Feedback updated successfully!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
+                      onPressed: () async {
+                        // Submit feedback to Firestore
+                        await FirebaseFirestore.instance
+                            .collection('sessions')
+                            .doc(session.id)
+                            .update({
+                              'rating': rating,
+                              'review': reviewController.text,
+                            });
+                        if (context.mounted) {
+                          Navigator.pop(context); // Close dialog
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => TutorBookingScreen(
+                                    tutorId: session.userId,
+                                  ),
+                            ),
+                          ); // Navigator.pushReplacementNamed(
+                          //   context,
+                          //   '/tutor-booking',
+                          //   arguments: session.userId,
+                          // );
+                        }
                       },
                       child: const Text('Save Changes'),
                     ),
@@ -701,216 +719,75 @@ class SessionDetailsScreen extends StatelessWidget {
     );
   }
 
-  void _showRecordingDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Session Recording'),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.videocam, color: Colors.red),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Recording Available',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text('Duration: 90 minutes'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text('Would you like to watch the session recording?'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Later'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Opening session recording...'),
+  void _downloadCertificate(BuildContext context) async {
+    // Generate a simple PDF certificate and trigger download
+    // (You may want to use the 'pdf' and 'printing' packages for more advanced certificates)
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        build:
+            (pw.Context context) => pw.Center(
+              child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Text(
+                    'Certificate of Completion',
+                    style: pw.TextStyle(
+                      fontSize: 32,
+                      fontWeight: pw.FontWeight.bold,
                     ),
-                  );
-                },
-                child: const Text('Watch Now'),
+                  ),
+                  pw.SizedBox(height: 24),
+                  pw.Text(
+                    'This certifies that',
+                    style: pw.TextStyle(fontSize: 18),
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Text(
+                    session.tutorName,
+                    style: pw.TextStyle(
+                      fontSize: 24,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Text(
+                    'has successfully completed the session:',
+                    style: pw.TextStyle(fontSize: 18),
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Text(session.title, style: pw.TextStyle(fontSize: 20)),
+                  pw.SizedBox(height: 24),
+                  pw.Text(
+                    'Date: ${session.formattedDateTime}',
+                    style: pw.TextStyle(fontSize: 16),
+                  ),
+                ],
               ),
-            ],
-          ),
-    );
-  }
-
-  void _showSessionNotes(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder:
-          (context) => DraggableScrollableSheet(
-            initialChildSize: 0.7,
-            maxChildSize: 0.9,
-            minChildSize: 0.5,
-            builder:
-                (context, scrollController) => Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'Session Notes',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          controller: scrollController,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildNoteSection('Key Topics Covered', [
-                                'Python syntax and basic structures',
-                                'Data types: strings, integers, lists, dictionaries',
-                                'Control flow: if statements, loops',
-                                'Functions and parameter passing',
-                                'Error handling basics',
-                              ]),
-                              const SizedBox(height: 20),
-                              _buildNoteSection('Important Code Examples', [
-                                'List comprehensions for data processing',
-                                'Dictionary methods and manipulation',
-                                'Function definitions with default parameters',
-                                'Try-except blocks for error handling',
-                              ]),
-                              const SizedBox(height: 20),
-                              _buildNoteSection('Homework & Next Steps', [
-                                'Complete practice exercises 1-5',
-                                'Read Chapter 3 of Python textbook',
-                                'Practice writing functions',
-                                'Prepare questions for next session',
-                              ]),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-          ),
-    );
-  }
-
-  Widget _buildNoteSection(String title, List<String> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        ...items.map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('• ', style: TextStyle(fontSize: 16)),
-                Expanded(
-                  child: Text(
-                    item,
-                    style: const TextStyle(fontSize: 15, height: 1.4),
-                  ),
-                ),
-              ],
             ),
-          ),
-        ),
-      ],
+      ),
     );
+    // Save and open the PDF
+    final bytes = await pdf.save();
+    final output = await getTemporaryDirectory();
+    final file = File('${output.path}/certificate_${session.id}.pdf');
+    await file.writeAsBytes(bytes);
+    await OpenFile.open(file.path);
+    if (context.mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TutorBookingScreen(tutorId: session.userId),
+        ),
+      );
+    }
   }
 
   void _showBookAgainDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('Book Another Session with ${session.tutorName}'),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            content: const Text(
-              'Would you like to book another session with this tutor?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Maybe Later'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Redirecting to booking page...'),
-                    ),
-                  );
-                },
-                child: const Text('Book Now'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _downloadCertificate(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Certificate downloaded successfully!'),
-        backgroundColor: Colors.green,
-        action: SnackBarAction(
-          label: 'View',
-          textColor: Colors.white,
-          onPressed: () {
-            // TODO: Open certificate viewer
-          },
-        ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TutorBookingScreen(tutorId: session.userId),
       ),
     );
   }
@@ -1046,4 +923,26 @@ class SessionDetailsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showRecordingDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder:
+        (context) => AlertDialog(
+          title: const Text('Coming Soon'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: const Text(
+            'This session was recorded. You can rewatch it anytime.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+  );
 }

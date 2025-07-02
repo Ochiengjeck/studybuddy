@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -261,7 +262,63 @@ class _TutorDetailsScreenState extends State<TutorDetailsScreen> {
                 listen: false,
               ).currentUser!.userType ==
               'admin')
-            SizedBox()
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.note_add),
+                label: const Text('Provide Notes'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: () async {
+                  final notes = await showDialog<String>(
+                    context: context,
+                    builder: (context) {
+                      final TextEditingController _controller =
+                          TextEditingController();
+                      return AlertDialog(
+                        title: const Text('Provide Notes for Tutor'),
+                        content: TextField(
+                          controller: _controller,
+                          maxLines: 5,
+                          decoration: const InputDecoration(
+                            hintText: 'Paste or type notes here...',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context, _controller.text.trim());
+                            },
+                            child: const Text('Submit'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                  if (notes != null && notes.isNotEmpty) {
+                    // Save notes to Firestore
+                    final tutorId = tutorProvider.selectedTutor!.id;
+                    await FirebaseFirestore.instance
+                        .collection('tutors')
+                        .doc(tutorId)
+                        .update({'notes': notes});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Notes added successfully!'),
+                      ),
+                    );
+                  }
+                },
+              ),
+            )
           else
             _buildBookingButton(theme),
           const SizedBox(height: 20),

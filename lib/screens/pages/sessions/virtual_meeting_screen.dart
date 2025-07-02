@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -11,6 +12,7 @@ import 'package:tencent_trtc_cloud/tx_device_manager.dart';
 
 import '../../../utils/modelsAndRepsositories/models_and_repositories.dart';
 import '../../../utils/providers/providers.dart';
+import '../../../widgets/maintainance_pop_up.dart';
 
 class VirtualMeetingScreen extends StatefulWidget {
   final Session session;
@@ -332,6 +334,117 @@ class _VirtualMeetingScreenState extends State<VirtualMeetingScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+    final startTime = widget.session.startTime;
+    final endTime = widget.session.startTime.add(widget.session.duration);
+
+    if (now.isBefore(startTime)) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.session.title),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 1,
+        ),
+        body: Center(
+          child: Text(
+            'This meeting has not started yet.\nStart time: '
+            '${startTime.toLocal().toString().substring(0, 16)}',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+      );
+    }
+    if (now.isAfter(endTime)) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.session.title),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 1,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'This meeting has ended.\nEnd time: '
+                '${endTime.toLocal().toString().substring(0, 16)}',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.check_circle),
+                label: const Text('Complete'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () async {
+                  try {
+                    // Update session status to completed
+                    await FirebaseFirestore.instance
+                        .collection('sessions')
+                        .doc(widget.session.id)
+                        .update({'status': 'completed'});
+                    // Optionally update user stats (sessionsCompleted++)
+                    final userId = widget.session.userId;
+                    final statsRef = FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(userId)
+                        .collection('stats')
+                        .doc('current');
+                    await statsRef.set({
+                      'sessions_completed': FieldValue.increment(1),
+                      'points_earned': FieldValue.increment(10),
+                    }, SetOptions(merge: true));
+
+                    final leadref = FirebaseFirestore.instance
+                        .collection('leaderboard')
+                        .doc(userId)
+                        .collection('stats')
+                        .doc('current');
+                    await statsRef.set({
+                      'sessions_completed': FieldValue.increment(1),
+                      'points_earned': FieldValue.increment(10),
+                    }, SetOptions(merge: true));
+
+                    if (mounted) {
+                      MaintenancePopup.show(
+                        context,
+                        title: "Congratulations !!",
+                        message: 'You have succesfully completed this session',
+                        primaryColor: Colors.lightGreen,
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      MaintenancePopup.show(
+                        context,
+                        title: "Oupsie !!",
+                        message:
+                            'We have encountered an rror processing your request, please try again',
+                      );
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: \\${e.toString()}')),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

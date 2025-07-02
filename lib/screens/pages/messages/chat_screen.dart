@@ -55,6 +55,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     chatProvider.loadMessages(widget.chatId);
 
+    // Reset unread counter for this chat
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final userId = appProvider.currentUser?.id;
+    if (userId != null) {
+      FirebaseConfig.firestore
+          .collection('users')
+          .doc(userId)
+          .collection('chats')
+          .doc(widget.chatId)
+          .update({'unread_count': 0});
+    }
+
     setState(() {
       _isInitialized = true;
     });
@@ -633,4 +645,3 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 }
-//

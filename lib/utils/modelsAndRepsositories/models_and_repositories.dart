@@ -1925,7 +1925,7 @@ class AchievementsRepository {
     try {
       final batch = FirebaseConfig.firestore.batch();
       final achievementsRef = FirebaseConfig.firestore
-          .collection('users')
+          .collection('leaderboard')
           .doc(userId)
           .collection('achievements');
 
@@ -2005,6 +2005,44 @@ class LeaderboardRepository {
       debugPrint('Error fetching leaderboard: $e');
       throw ApiError.fromFirebaseException(e);
     }
+  }
+
+  Future<void> initializeDefaultLeaderboard({
+    int defaultPoints = 0,
+    List<String> defaultBadges = const [],
+    List<String> defaultAchievements = const [],
+  }) async {
+    final usersSnapshot =
+        await FirebaseConfig.firestore.collection('users').get();
+    final leaderboardRef = FirebaseConfig.firestore.collection('leaderboard');
+    final leaderboardSnapshot = await leaderboardRef.get();
+    final leaderboardUserIds =
+        leaderboardSnapshot.docs.map((doc) => doc.id).toSet();
+    final batch = FirebaseConfig.firestore.batch();
+
+    for (final doc in usersSnapshot.docs) {
+      final userId = doc.id;
+      if (!leaderboardUserIds.contains(userId)) {
+        final userData = doc.data();
+        batch.set(leaderboardRef.doc(userId), {
+          'id': userId,
+          'name':
+              '${userData['first_name'] ?? ''} ${userData['last_name'] ?? ''}'
+                      .trim()
+                      .isEmpty
+                  ? userData['email']
+                  : '${userData['first_name'] ?? ''} ${userData['last_name'] ?? ''}'
+                      .trim(),
+          'points': defaultPoints,
+          'badges': defaultBadges,
+          'achievements': defaultAchievements,
+          'profile_picture': userData['profile_picture'],
+          'position': 0,
+          'lastActive': userData['last_login'] ?? FieldValue.serverTimestamp(),
+        });
+      }
+    }
+    await batch.commit();
   }
 
   Future<ApiResponse<List<LeaderboardUser>>> getTopPerformers() async {
@@ -2439,32 +2477,11 @@ class SessionRepository {
     DateTime? endDate,
   }) async {
     try {
-      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
-          .collection('sessions')
-          .where('status', isEqualTo: 'upcoming')
-          .where('type', isEqualTo: 'organized');
-
-      if (subject != null && subject.isNotEmpty) {
-        query = query.where('subject', isEqualTo: subject);
-      }
-      if (level != null && level.isNotEmpty) {
-        query = query.where('level', isEqualTo: level);
-      }
-      if (startDate != null) {
-        query = query.where(
-          'start_time',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
-        );
-      }
-      if (endDate != null) {
-        query = query.where(
-          'start_time',
-          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
-        );
-      }
-
       final snapshot =
-          await query.orderBy('start_time', descending: false).get();
+          await FirebaseConfig.firestore
+              .collection('sessions')
+              .where('status', isEqualTo: 'upcoming')
+              .get();
 
       final sessions =
           snapshot.docs
@@ -2888,7 +2905,7 @@ class TutorRepository {
 
       final tutorData = {
         'type': 'tutor',
-        'userId': applicationData['userId'],
+        'user_Id': applicationData['userId'],
         'bio': bio,
         'education': education,
         'experience': experience,
@@ -2911,6 +2928,10 @@ class TutorRepository {
       };
 
       await applicationRef.update(tutorData);
+      await FirebaseConfig.firestore
+          .collection('users')
+          .doc(applicationData['userId'])
+          .update({'user_type': 'tutor'});
 
       return ApiResponse<Tutor>(
         success: true,

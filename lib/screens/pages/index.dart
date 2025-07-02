@@ -16,6 +16,8 @@ import 'package:studybuddy/utils/providers/providers.dart';
 // import 'package:studybuddy/widgets/bottom_navigation_bar.dart';
 import 'package:studybuddy/widgets/drawer.dart';
 
+import '../../widgets/maintainance_pop_up.dart';
+
 class IndexPage extends StatefulWidget {
   const IndexPage({super.key});
 
@@ -468,7 +470,7 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
                   color: Theme.of(context).primaryColor,
                 ),
                 onPressed: () {
-                  // Handle notifications
+                  MaintenancePopup.show(context);
                 },
               ),
               Positioned(

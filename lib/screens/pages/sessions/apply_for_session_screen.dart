@@ -21,7 +21,7 @@ class _ApplyForSessionScreenState extends State<ApplyForSessionScreen>
 
   String _selectedSubject = 'Mathematics';
   String _selectedLevel = 'Beginner';
-  String _selectedPlatform = 'Google Meet';
+  String _selectedPlatform = 'Virtual';
   DateTime? _preferredDateTime;
   Duration _preferredDuration = const Duration(hours: 1);
 
@@ -45,12 +45,7 @@ class _ApplyForSessionScreenState extends State<ApplyForSessionScreen>
     'Expert',
   ];
 
-  final List<String> _platforms = [
-    'Google Meet',
-    'Zoom',
-    'Microsoft Teams',
-    'Skype',
-  ];
+  final List<String> _platforms = ['Virtual', 'Phsical', 'Hybrid', 'Other'];
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;

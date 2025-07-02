@@ -51,6 +51,8 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
+            <string>mailto</string>
+            <string>tel</string>
         </intent>
     </queries>
 
